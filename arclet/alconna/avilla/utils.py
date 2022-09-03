@@ -77,12 +77,12 @@ def command(
     def wrapper(func: T_Callable) -> T_Callable:
         cube: Cube[ListenerSchema] = ensure_cube_as_listener(func)
         cube.metaclass.listening_events.append(MessageReceived)
+        if not guild and not private:
+            raise ValueError
         if not guild:
             cube.metaclass.inline_dispatchers.append(Filter().ctx.follows("friend"))
         elif not private:
             cube.metaclass.inline_dispatchers.append(Filter().ctx.follows("group"))
-        else:
-            raise ValueError
         cube.metaclass.inline_dispatchers.append(
             AvillaAlconnaDispatcher(
                 alconna, send_flag="post" if post else "reply", skip_for_unmatch=not send_error  # type: ignore
