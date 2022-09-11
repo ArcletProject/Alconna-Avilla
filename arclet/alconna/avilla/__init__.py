@@ -1,4 +1,5 @@
 from arclet.alconna.graia import (
+    Alc as Alc,
     GraiaCommandAnalyser as GraiaCommandAnalyser,
     Match as Match,
     Query as Query,
@@ -10,8 +11,7 @@ from arclet.alconna.graia import (
     match_path as match_path,
     match_value as match_value
 )
-from .dispatcher import AvillaAlconnaDispatcher, AvillaAlconnaOutputMessage
-from .utils import NoticeID, fetch_name, command, from_command
+from .dispatcher import AvillaAlconnaOutputMessage
+from .utils import NoticeID, fetch_name, alcommand, from_command
 
 GraiaCommandAnalyser.filter_out = []
-Alc = AvillaAlconnaDispatcher

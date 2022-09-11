@@ -34,7 +34,7 @@ dependencies = [
 
 [[package]]
 name = "arclet-alconna-graia"
-version = "0.5.0"
+version = "0.5.1"
 requires_python = ">=3.8"
 summary = "Support Alconna to GraiaProject"
 dependencies = [
@@ -258,7 +258,7 @@ summary = "Backport of pathlib-compatible object wrapper for zip files"
 
 [metadata]
 lock_version = "4.0"
-content_hash = "sha256:37c9407836ce4ee3326295ecb996e2afd1b7eab6d4f88773c57faada3c5c1bbe"
+content_hash = "sha256:e82f3dd781d6af624a008527002f3e19ad94065ae303e04aa317e834fb0fec69"
 
 [metadata.files]
 "aiohttp 3.8.1" = [
@@ -343,9 +343,9 @@ content_hash = "sha256:37c9407836ce4ee3326295ecb996e2afd1b7eab6d4f88773c57faada3
     {url = "https://files.pythonhosted.org/packages/0b/09/449cc29e28018baeeff8fc5c14096dc28bb4a03edef51335875bb4342e7b/arclet-alconna-1.2.0.7.tar.gz", hash = "sha256:43720f95bec6a12bf027d7442eca360cac6d610fadbe19fc2d9355284442fb1e"},
     {url = "https://files.pythonhosted.org/packages/0b/d4/90e038b4f6fae4c0b87e65ab1d3212d59b89225cfa285b2889a928892980/arclet_alconna-1.2.0.7-py3-none-any.whl", hash = "sha256:b6c6149bb42a34b4354fbbb19b1544700ce5643b731f2dbf551f500154889840"},
 ]
-"arclet-alconna-graia 0.5.0" = [
-    {url = "https://files.pythonhosted.org/packages/0d/9b/619eaa289bd0c5bb5352ab54d9044ab6638226300790032927be9b4b1b18/arclet-alconna-graia-0.5.0.tar.gz", hash = "sha256:9572ba9c7a15d2b6d8d8a68e7c98d913bbad695cfcc59ce4d7fbcb0e776bdfe1"},
-    {url = "https://files.pythonhosted.org/packages/ee/72/d32dc2edd09141b7cddc761e8313bd8ab7a2bf68c9a985dc7a4965263973/arclet_alconna_graia-0.5.0-py3-none-any.whl", hash = "sha256:f1b6910f87c74802462d37b291ebd5072d239f47f6f235f30f76af4ab8c65609"},
+"arclet-alconna-graia 0.5.1" = [
+    {url = "https://files.pythonhosted.org/packages/36/3f/424ba352effc5b06a21d4906834a1ac0c8706863a86ffcbe9693d05e2635/arclet-alconna-graia-0.5.1.tar.gz", hash = "sha256:c281c576dc31a45a458a67c994e3efe6d0c904d98be68d42ef6950dcc7741917"},
+    {url = "https://files.pythonhosted.org/packages/62/95/9ed433e3d6b17faf2060509f7ed4af64384bbca2243b5fdd4b28af8c126d/arclet_alconna_graia-0.5.1-py3-none-any.whl", hash = "sha256:f4bac265a6322149f66dc6215579d9cc781a6e483db9dc8e3f425504b39aa65e"},
 ]
 "async-timeout 4.0.2" = [
     {url = "https://files.pythonhosted.org/packages/54/6e/9678f7b2993537452710ffb1750c62d2c26df438aa621ad5fa9d1507a43a/async-timeout-4.0.2.tar.gz", hash = "sha256:2163e1640ddb52b7a8c80d0a67a08587e5d245cc9c553a74a847056bc2976b15"},

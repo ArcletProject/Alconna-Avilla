@@ -1,20 +1,8 @@
-import sys
-from typing import (
-    Callable,
-    Optional,
-    TypedDict,
-    Union,
-    Any,
-    Coroutine,
-    ClassVar
-)
-from arclet.alconna import (
-    output_manager,
-    Arpamar,
-)
+from contextlib import suppress
+from typing import Optional, Union
+from arclet.alconna import Arpamar
 from arclet.alconna.core import Alconna, AlconnaGroup
 
-from graia.broadcast.exceptions import ExecutionStop, PropagationCancelled
 from graia.broadcast.entities.dispatcher import BaseDispatcher
 from graia.broadcast.interfaces.dispatcher import DispatcherInterface
 from graia.broadcast.utilles import run_always_await
@@ -71,88 +59,54 @@ class AvillaAlconnaOutputMessage(AvillaEvent):
         return self.source_event.ctx
 
 
-class _AlconnaLocalStorage(TypedDict):
-    alconna_result: AlconnaProperty[MessageReceived]
+async def _fetch_quote(self: AlconnaDispatcher, message: MessageChain) -> bool:  # noqa
+    try:
+        interface = DispatcherInterface.ctx.get()
+    except LookupError:
+        return False
+    message: Message = await interface.lookup_param(
+        "message", Message, None
+    )
+    return not self.allow_quote and message.reply
+
+AlconnaDispatcher.fetch_quote = _fetch_quote
 
 
-class AvillaAlconnaDispatcher(AlconnaDispatcher):
-
-    async def beforeExecution(self, interface: DispatcherInterface):
-        async def send_output(
-            result: Arpamar,
-            output_text: Optional[str] = None,
-            source: Optional[MessageReceived] = None,
-        ) -> AlconnaProperty[MessageReceived]:
-
-            id_ = id(source) if source else 0
-            cache = output_cache.setdefault(id_, {})
-            if self.command not in cache:
-                cache.clear()
-                cache[self.command] = True
-                if result.matched is False and output_text:
-                    if source and self.send_flag == "reply":
-                        rs: Relationship = await source.account.get_relationship(source.ctx)
-                        help_message: MessageChain = await run_always_await(
-                            self.send_handler, output_text
-                        )
-                        await rs.send_message(help_message)
-                        return AlconnaProperty(result, None, source)
-                    if source and self.send_flag == "post":
-                        rs: Relationship = await source.account.get_relationship(source.ctx)
-                        dispatchers = [AvillaOutputDispatcher(self.command, output_text, source)]
-                        for listener in interface.broadcast.default_listener_generator(
-                            AvillaAlconnaOutputMessage
-                        ):
-                            await interface.broadcast.Executor(
-                                listener, dispatchers=dispatchers
-                            )
-                            listener.oplog.clear()
-                        return AlconnaProperty(result, None, source)
-                return AlconnaProperty(result, output_text, source)
-            return AlconnaProperty(result, None, source)
-
-        message: Message = await interface.lookup_param(
-            "message", Message, None
+async def _send_output(
+    self: AlconnaDispatcher,
+    result: Arpamar,
+    output_text: Optional[str] = None,
+    source: Optional[MessageReceived] = None,
+) -> AlconnaProperty[MessageReceived]:
+    if not result.matched or not output_text:
+        return AlconnaProperty(result, None, source)
+    id_ = id(source) if source else 0
+    cache = output_cache.setdefault(id_, set())
+    if self.command in cache:
+        return AlconnaProperty(result, None, source)
+    cache.clear()
+    cache.add(self.command)
+    if self.send_flag == "stay":
+        return AlconnaProperty(result, output_text, source)
+    if self.send_flag == "reply":
+        rs: Relationship = await source.account.get_relationship(source.ctx)
+        help_message: MessageChain = await run_always_await(
+            self.send_handler, output_text
         )
-        if not self.allow_quote and message.reply:
-            raise ExecutionStop
+        await rs.send_message(help_message)
+    elif self.send_flag == "post":
+        with suppress(LookupError):
+            interface = DispatcherInterface.ctx.get()
+            dispatchers = [AvillaOutputDispatcher(self.command, output_text, source)]
+            for listener in interface.broadcast.default_listener_generator(
+                    AvillaAlconnaOutputMessage
+            ):
+                await interface.broadcast.Executor(
+                    listener, dispatchers=dispatchers
+                )
+                listener.oplog.clear()
+            return AlconnaProperty(result, None, source)
+    return AlconnaProperty(result, None, source)
 
-        may_help_text = None
 
-        def _h(string):
-            nonlocal may_help_text
-            may_help_text = string
-
-        try:
-            output_manager.set_action(_h, self.command.name)
-            _res = self.command.parse(message.content)
-        except Exception as e:
-            _res = Arpamar(
-                self.command.commands[0] if self.command._group else self.command
-            )
-            _res.head_matched = False
-            _res.matched = False
-            _res.error_info = repr(e)
-            _res.error_data = []
-        if (
-            not may_help_text
-            and not _res.matched
-            and ((not _res.head_matched) or self.skip_for_unmatch)
-        ):
-            raise ExecutionStop
-        if not may_help_text and _res.error_info:
-            may_help_text = (
-                str(_res.error_info).strip("'").strip("\\n").split("\\n")[-1]
-            )
-        if not may_help_text and _res.matched:
-            output_cache.clear()
-            sys.audit("success_analysis", self.command)
-        try:
-            _property = await send_output(_res, may_help_text, interface.event)
-        except LookupError:
-            _property = await send_output(_res, may_help_text, None)
-        local_storage: _AlconnaLocalStorage = interface.local_storage  # type: ignore
-        if not _res.matched and not _property.output_text:
-            raise PropagationCancelled
-        local_storage["alconna_result"] = _property
-        return
+AlconnaDispatcher.send_output = _send_output

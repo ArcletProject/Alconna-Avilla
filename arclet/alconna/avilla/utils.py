@@ -1,24 +1,20 @@
 import inspect
-from typing import Union, Any, Dict, Optional
-from nepattern import PatternModel, pattern_map, BasePattern, Empty
+from typing import Union, Dict, Optional
+from nepattern import PatternModel, BasePattern
 from graia.saya.cube import Cube
 from graia.saya.builtins.broadcast import ListenerSchema
 from graia.saya import Channel
 from graiax.shortcut.saya import ensure_cube_as_listener, Wrapper, T_Callable
 from graia.broadcast.builtin.decorators import Depend
-from graia.broadcast.exceptions import ExecutionStop
 
 from arclet.alconna import Alconna, AlconnaFormat
-from arclet.alconna.graia.saya import AlconnaSchema
-from arclet.alconna.graia.dispatcher import AlconnaProperty
+from arclet.alconna.graia import AlconnaProperty, AlconnaSchema, AlconnaDispatcher
 
 from avilla.core.elements import Notice
 from avilla.core.cell.cells import Summary
 from avilla.core.relationship import Relationship
 from avilla.core.event.message import MessageReceived
 from avilla.core.tools.filter import Filter
-
-from .dispatcher import AvillaAlconnaDispatcher
 
 
 NoticeID = BasePattern(
@@ -54,7 +50,7 @@ def fetch_name(path: str = "name"):
     return Depend(__wrapper__)
 
 
-def command(
+def alcommand(
     alconna: Alconna,
     guild: bool = True,
     private: bool = True,
@@ -84,7 +80,7 @@ def command(
         elif not private:
             cube.metaclass.inline_dispatchers.append(Filter().ctx.follows("group"))
         cube.metaclass.inline_dispatchers.append(
-            AvillaAlconnaDispatcher(
+            AlconnaDispatcher(
                 alconna, send_flag="post" if post else "reply", skip_for_unmatch=not send_error  # type: ignore
             )
         )
@@ -129,6 +125,6 @@ def from_command(
 __all__ = [
     "NoticeID",
     "fetch_name",
-    "command",
+    "alcommand",
     "from_command",
 ]
