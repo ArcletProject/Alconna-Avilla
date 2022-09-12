@@ -1,5 +1,3 @@
-import inspect
-from typing import Union, Dict, Optional
 from nepattern import PatternModel, BasePattern
 from graia.saya.cube import Cube
 from graia.saya.builtins.broadcast import ListenerSchema
@@ -7,7 +5,7 @@ from graia.saya import Channel
 from graiax.shortcut.saya import ensure_cube_as_listener, Wrapper, T_Callable
 from graia.broadcast.builtin.decorators import Depend
 
-from arclet.alconna import Alconna, AlconnaFormat
+from arclet.alconna import Alconna
 from arclet.alconna.graia import AlconnaProperty, AlconnaSchema, AlconnaDispatcher
 
 from avilla.core.elements import Notice
@@ -91,40 +89,8 @@ def alcommand(
     return wrapper
 
 
-def from_command(
-    format_command: str,
-    args: Optional[Dict[str, Union[type, BasePattern]]] = None,
-    post: bool = False,
-) -> Wrapper:
-    """
-    saya-util 形式的仅注入一个 AvillaAlconnaDispatcher, 事件监听部分自行处理
-
-    Args:
-        format_command: 格式化命令字符串
-        args: 格式化填入内容
-        post: 是否以事件发送输出信息
-    """
-
-    def wrapper(func: T_Callable) -> T_Callable:
-        custom_args = {
-            v.name: v.annotation for v in inspect.signature(func).parameters.values()
-        }
-        custom_args.update(args or {})
-        cube: Cube[ListenerSchema] = ensure_cube_as_listener(func)
-        cmd = AlconnaFormat(format_command, custom_args)
-        cube.metaclass.inline_dispatchers.append(
-            AvillaAlconnaDispatcher(cmd, send_flag="post" if post else "reply")  # type: ignore
-        )
-        channel = Channel.current()
-        channel.use(AlconnaSchema(cmd))(func)
-        return func
-
-    return wrapper
-
-
 __all__ = [
     "NoticeID",
     "fetch_name",
-    "alcommand",
-    "from_command",
+    "alcommand"
 ]
