@@ -69,10 +69,10 @@ def alcommand(
         alconna.meta.example = alconna.meta.example.replace("$", alconna.headers[0])
 
     def wrapper(func: T_Callable) -> T_Callable:
+        if not guild and not private:
+            return func
         cube: Cube[ListenerSchema] = ensure_cube_as_listener(func)
         cube.metaclass.listening_events.append(MessageReceived)
-        if not guild and not private:
-            raise ValueError
         if not guild:
             cube.metaclass.inline_dispatchers.append(Filter().ctx.follows("friend"))
         elif not private:
