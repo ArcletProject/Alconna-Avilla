@@ -1,12 +1,15 @@
-from nepattern import PatternModel, BasePattern
+from typing import Union
+
+from nepattern import PatternModel, BasePattern, UnionArg, type_parser
 from graia.saya.cube import Cube
 from graia.saya.builtins.broadcast import ListenerSchema
 from graia.saya import Channel
 from graiax.shortcut.saya import ensure_cube_as_listener, Wrapper, T_Callable
 from graia.broadcast.builtin.decorators import Depend
 
-from arclet.alconna import Alconna
+from arclet.alconna import Alconna, AlconnaGroup
 from arclet.alconna.graia import AlconnaProperty, AlconnaSchema, AlconnaDispatcher
+from arclet.alconna.tools import AlconnaString
 
 from avilla.core.elements import Notice
 from avilla.core.cell.cells import Summary
@@ -15,13 +18,25 @@ from avilla.core.event.message import MessageReceived
 from avilla.core.tools.filter import Filter
 
 
-NoticeID = BasePattern(
-    model=PatternModel.TYPE_CONVERT,
-    origin=int,
-    alias="notice_id",
-    accepts=[str, Notice, int],
-    converter=lambda x: int(x.target.pattern['contact']) if isinstance(x, Notice) else int(str(x).lstrip("@")),
-)
+NoticeID = UnionArg(
+    [
+        BasePattern(
+            model=PatternModel.TYPE_CONVERT,
+            origin=int,
+            alias="notice",
+            accepts=[Notice],
+            converter=lambda x: int(x.target.pattern['contact'])
+        ),
+        BasePattern(
+            r"@(\d+)",
+            model=PatternModel.REGEX_CONVERT,
+            origin=int,
+            alias="@xxx",
+            accepts=[str],
+        ),
+        type_parser(int)
+    ]
+) @ "notice_id"
 """
 内置类型，允许传入提醒元素(Notice)或者'@xxxx'式样的字符串或者数字, 返回数字
 """
@@ -49,7 +64,7 @@ def fetch_name(path: str = "name"):
 
 
 def alcommand(
-    alconna: Alconna,
+    alconna: Union[Alconna, AlconnaGroup, str],
     guild: bool = True,
     private: bool = True,
     send_error: bool = False,
@@ -65,6 +80,12 @@ def alcommand(
         send_error: 是否发送错误信息
         post: 是否以事件发送输出信息
     """
+    if isinstance(alconna, str):
+        if not alconna.strip():
+            raise ValueError(alconna)
+        cmds = alconna.split(";")
+        alconna = AlconnaString(cmds[0], *cmds[1:])
+
     if alconna.meta.example and "$" in alconna.meta.example:
         alconna.meta.example = alconna.meta.example.replace("$", alconna.headers[0])
 
