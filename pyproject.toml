@@ -1,16 +1,15 @@
 [project]
 name = "arclet-alconna-avilla"
-version = "0.2.0"
+version = "0.3.0"
 description = "Support Alconna for Avilla"
 authors = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
 ]
 dependencies = [
-    "avilla-core>=1.0.0rc4",
-    "arclet-alconna<2.0.0, >=1.3.0",
-    "graiax-shortcut>=0.1.0",
-    "graia-saya>=0.0.16",
-    "arclet-alconna-graia>=0.7.2",
+    "avilla-core~=1.0.0a5",
+    "arclet-alconna<2.0.0, >=1.4.3",
+    "graia-saya>=0.0.17",
+    "arclet-alconna-graia>=0.10.4",
 ]
 requires-python = ">=3.9"
 readme = "README.md"

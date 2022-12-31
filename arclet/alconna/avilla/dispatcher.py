@@ -1,25 +1,20 @@
 from contextlib import suppress
 from typing import Optional, Union
-from arclet.alconna import Arpamar
-from arclet.alconna.core import Alconna, AlconnaGroup
 
+from arclet.alconna import Arparma
+from arclet.alconna.core import Alconna, AlconnaGroup
+from arclet.alconna.graia.dispatcher import AlconnaDispatcher, output_cache
+from arclet.alconna.graia.model import AlconnaProperty
+from avilla.core.context import Context
+from avilla.core.event import AvillaEvent
+from avilla.spec.core.message import MessageReceived
+from graia.amnesia.message import MessageChain
 from graia.broadcast.entities.dispatcher import BaseDispatcher
 from graia.broadcast.interfaces.dispatcher import DispatcherInterface
 from graia.broadcast.utilles import run_always_await
 
-from graia.amnesia.message import MessageChain
-
-from arclet.alconna.graia.dispatcher import output_cache, AlconnaProperty, AlconnaDispatcher
-
-from avilla.core.event import AvillaEvent
-from avilla.core.event.message import MessageReceived
-from avilla.core.relationship import Relationship
-from avilla.core.message import Message
-from avilla.core.utilles.selector import Selector
-
 
 class AvillaOutputDispatcher(BaseDispatcher):
-
     def __init__(
         self, command: Union[Alconna, AlconnaGroup], text: str, source: MessageReceived
     ):
@@ -54,27 +49,10 @@ class AvillaAlconnaOutputMessage(AvillaEvent):
     source_event: MessageReceived
     """来源事件"""
 
-    @property
-    def ctx(self) -> Selector:
-        return self.source_event.ctx
-
-
-async def _fetch_quote(self: AlconnaDispatcher, message: MessageChain) -> bool:  # noqa
-    try:
-        interface = DispatcherInterface.ctx.get()
-    except LookupError:
-        return False
-    message: Message = await interface.lookup_param(
-        "message", Message, None
-    )
-    return not self.allow_quote and message.reply
-
-AlconnaDispatcher.fetch_quote = _fetch_quote
-
 
 async def _send_output(
     self: AlconnaDispatcher,
-    result: Arpamar,
+    result: Arparma,
     output_text: Optional[str] = None,
     source: Optional[MessageReceived] = None,
 ) -> AlconnaProperty[MessageReceived]:
@@ -89,21 +67,19 @@ async def _send_output(
     if self.send_flag == "stay":
         return AlconnaProperty(result, output_text, source)
     if self.send_flag == "reply":
-        rs: Relationship = await source.account.get_relationship(source.ctx)
+        ctx: Context = source.context
         help_message: MessageChain = await run_always_await(
             self.send_handler, output_text
         )
-        await rs.send_message(help_message)
+        await ctx.scene.send_message(help_message)
     elif self.send_flag == "post":
         with suppress(LookupError):
             interface = DispatcherInterface.ctx.get()
             dispatchers = [AvillaOutputDispatcher(self.command, output_text, source)]
             for listener in interface.broadcast.default_listener_generator(
-                    AvillaAlconnaOutputMessage
+                AvillaAlconnaOutputMessage
             ):
-                await interface.broadcast.Executor(
-                    listener, dispatchers=dispatchers
-                )
+                await interface.broadcast.Executor(listener, dispatchers=dispatchers)
                 listener.oplog.clear()
             return AlconnaProperty(result, None, source)
     return AlconnaProperty(result, None, source)
