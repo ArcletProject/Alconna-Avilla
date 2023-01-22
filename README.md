@@ -1,4 +1,6 @@
-# Alconna Graia
+# Alconna Avilla
+
+> 本 repo 作为 该项目存根使用
 
 该项目为 [`Alconna`](https://github.com/ArcletProject/Alconna) 为 [`GraiaProject`](https://github.com/GraiaProject) 下项目的内建支持
 
@@ -8,9 +10,36 @@
 
 ### 单文件
 
+ariadne:
+
 ```python
-from arclet.alconna.graia import Alconna, Match, AlconnaProperty
-from arclet.alconna.avilla import AlconnaDispatcher
+from arclet.alconna.graia import Alconna, AlconnaDispatcher, Match, AlconnaProperty
+from arclet.alconna import Args
+...
+
+app = Ariadne(...)
+
+
+alc = Alconna("!jrrp", Args["sth", str, 1123])
+
+@app.broadcast.receiver(
+    GroupMessage,
+    dispatchers=[AlconnaDispatcher(alc, send_flag='stay')]
+)
+async def test2(
+    group: Group,
+    result: AlconnaProperty[GroupMessage],
+    sth: Match[str]
+):
+    print("sign:", result.result)
+    print("sender:", group)
+    print("match", sth.available, sth.result)
+```
+
+avilla:
+
+```python
+from arclet.alconna.graia import Alconna, AlconnaDispatcher, Match, AlconnaProperty
 from arclet.alconna import Args
 ...
 
@@ -39,8 +68,7 @@ async def test2(
 
 in module.py:
 ```python
-from arclet.alconna.graia import Alconna, Match, AlconnaProperty, AlconnaSchema
-from arclet.alconna.avilla import AlconnaDispatcher
+from arclet.alconna.graia import Alconna, AlconnaDispatcher, Match, AlconnaProperty, AlconnaSchema
 from arclet.alconna import Args
 ...
 channel = Channel.current()
@@ -48,10 +76,9 @@ channel = Channel.current()
 alc = Alconna("!jrrp", Args["sth", str, 1123])
 
 @channel.use(AlconnaSchema(AlconnaDispatcher(alc)))
-@channel.use(ListenerSchema([MessageReceived]))
-async def test2(context: Context, result: AlconnaProperty[MessageReceived], sth: Match[str]):
+@channel.use(ListenerSchema([...]))
+async def test2(result: AlconnaProperty[...], sth: Match[str]):
     print("sign:", result.result)
-    print("sender:", context.scene)
     print("match", sth.available, sth.result)
 
 
@@ -76,43 +103,39 @@ in module.py:
 
 ```python
 from graiax.shortcut.saya import listen
-from arclet.alconna.graia import Alconna, Match, from_command, startswith, endswith
-from arclet.alconnaavilla import alcommand
+from arclet.alconna.graia import alcommand, Alconna, Match, from_command, startswith, endswith
 from arclet.alconna import  Args, Arpamar
 
 ...
 
 
 @alcommand(Alconna("!jrrp", Args["sth", str, 1123]), private=False)
-async def test1(context: Context, result: Arpamar, sth: Match[str]):
+async def test1(result: Arpamar, sth: Match[str]):
     print("sign:", result)
-    print("sender:", context.scene)
     print("match", sth.available, sth.result)
 
 
 @alcommand("[!|.]hello <name:str>;say <word>", send_error=True)
-async def test1(context: Context, result: Arpamar, name: Match[str]):
+async def test1(result: Arpamar, name: Match[str]):
     print("sign:", result)
-    print("sender:", context.scene)
     print("match", name.available, name.result)
 
     
-@listen(MessageReceived) 
+@listen(...) 
 @from_command("foo bar {baz}")
-async def test2(context: Context, baz: int):
-    print("sender:", context.scene)
+async def test2(baz: int):
     print("baz", baz)
     
     
-@listen(MessageReceived)
+@listen(...)
 @startswith("foo bar")
-async def test3(event: MessageReceived):
+async def test3(event: ...):
     ...
 
 
-@listen(MessageReceived)
+@listen(...)
 @endswith(int)
-async def test4(event: MessageReceived):
+async def test4(event: ...):
     ...
 ```
 
@@ -138,7 +161,6 @@ class AlconnaDispatcher(BaseDispatcher, Generic[TOHandler]):
         *,
         send_flag: Literal["reply", "post", "stay"] = "stay",
         skip_for_unmatch: bool = True,
-        output_handler: type[TOHandler] | None = None,
         message_converter: Callable[[str], MessageChain | Coroutine[Any, Any, MessageChain]] | None = None,
     ): ...
 ```
@@ -151,8 +173,6 @@ class AlconnaDispatcher(BaseDispatcher, Generic[TOHandler]):
 - stay: 存入 AlconnaProperty 传递给事件处理器
 
 `skip_for_unmatch`: 解析失败时是否跳过, 否则错误信息按 send_flag 处理
-
-`output_handler`: 处理命令输出信息的发送的类
 
 `message_converter`: send_flag 为 reply 时 输出信息的预处理器
 
@@ -169,8 +189,7 @@ class AlconnaDispatcher(BaseDispatcher, Generic[TOHandler]):
 - `assign`: 依托路径是否匹配成功为命令分发处理器。
 
 ```python
-from arclet.alconna.graia import assign
-from arclet.alconna.avilla import alcommand
+from arclet.alconna.graia import assign, alcommand
 from arclet.alconna import Alconna, Arpamar
 ...
 
@@ -190,12 +209,11 @@ async def bar_baz_1(result: Arpamar):
 ## 便捷方法
 
 ```python
-from arclet.alconna.graia import Match
-from arclet.alconna/avilla import Alc
+from arclet.alconna.graia import Match, Alc
 ...
 
 @app.broadcast.receiver(
-    MessageReceived, dispatchers=[Alc.from_format("foo bar {baz:int}")]
+    ..., dispatchers=[Alc.from_format("foo bar {baz:int}")]
 )
 async def test2(baz: Match[int]):
     print("match", baz.available, baz.result)
@@ -209,7 +227,7 @@ from arclet.alconna.graia import Match, AlconnaSchema
 channel = Channel.current()
 
 @channel.use(AlconnaSchema.from_("foo <arg:str>", "bar"))
-@channel.use(ListenerSchema([MessageReceived]))
+@channel.use(ListenerSchema([...]))
 async def test2(sth: Match[str]):
     print("match", sth.available, sth.result)
 ```

@@ -1,13 +1,13 @@
 [project]
 name = "arclet-alconna-avilla"
-version = "0.11.0"
+version = "0.11.1"
 description = "Support Alconna for GraiaProject/Avilla"
 authors = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
 ]
 dependencies = [
     "avilla-core~=1.0.0a5",
-    "arclet-alconna-graia>=0.11.0",
+    "arclet-alconna-graia>=0.11.1",
 ]
 requires-python = ">=3.9"
 readme = "README.md"
@@ -16,4 +16,4 @@ license = {text = "AGPL-3.0"}
 [tool]
 [tool.pdm]
 [tool.pdm.build]
-includes = ["arclet/alconna/avilla"]
+includes = ["src/arclet/alconna/avilla"]
