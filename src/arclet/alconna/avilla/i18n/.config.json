@@ -1,0 +1,9 @@
+{
+  "default": "zh-CN",
+  "frozen": [
+    "comp/graia"
+  ],
+  "require": [
+    "comp/graia"
+  ]
+}

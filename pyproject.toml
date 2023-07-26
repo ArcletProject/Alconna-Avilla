@@ -6,8 +6,15 @@ authors = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
 ]
 dependencies = [
-    "avilla-core~=1.0.0a5",
-    "arclet-alconna-graia>=0.11.1",
+    "arclet-alconna<2.0.0, >=1.7.14",
+    "arclet-alconna-tools<0.7.0, >=0.6.3",
+    "tarina>=0.3.3",
+    "nepattern<0.6.0, >=0.5.10",
+    "creart-graia>=0.1.5",
+    "creart>=0.2.1",
+    "graia-amnesia>=0.5.0",
+    "graia-broadcast>=0.18.2",
+    "graia-saya>=0.0.17",
 ]
 requires-python = ">=3.9"
 readme = "README.md"

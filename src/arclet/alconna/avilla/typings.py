@@ -1,13 +1,13 @@
 from nepattern import (
     BasePattern,
     PatternModel,
-    UnionArg,
+    UnionPattern,
 )
 from nepattern.main import INTEGER
 from avilla.core.elements import Notice
 
 NoticeID = (
-    UnionArg(
+    UnionPattern(
         [
             BasePattern(
                 model=PatternModel.TYPE_CONVERT,
