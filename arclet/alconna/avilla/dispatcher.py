@@ -96,7 +96,7 @@ class AlconnaDispatcher(BaseDispatcher):
     default_send_handler: ClassVar[TConvert] = lambda _, x: MessageChain([Text(x)])
 
     @staticmethod
-    def completion_waiter(self, source: AvillaMessageEvent, priority: int = 15) -> Waiter:
+    def completion_waiter(source: AvillaMessageEvent, priority: int = 15) -> Waiter:
         @Waiter.create_using_function(
             [MessageReceived],
             block_propagation=True,

@@ -1,15 +1,17 @@
 """
-Alconna 对于 Graia 系列的支持
+Alconna 对于 Avilla 的支持
 
 """
+from pathlib import Path
+from tarina import lang
+
+lang.load(Path(__file__).parent / "i18n")
 
 from . import alc as alc
-from .adapter import AlconnaGraiaAdapter
 from .argv import BaseMessageChainArgv
 from .dispatcher import AlconnaOutputMessage, AlconnaDispatcher
 from .model import CommandResult, Match, Query, Header
 from .saya import AlconnaBehaviour, AlconnaSchema
-from .service import AlconnaGraiaService
 from .tools import (
     MatchPrefix,
     MatchSuffix,
@@ -22,8 +24,6 @@ from .tools import (
     match_value,
     shortcuts,
     startswith,
-    check_account,
-    mention,
     funcommand,
 )
 
