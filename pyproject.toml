@@ -12,11 +12,11 @@ dependencies = [
     "nepattern<0.6.0, >=0.5.10",
     "creart-graia>=0.1.5",
     "creart>=0.2.1",
-    "graia-amnesia>=0.5.0",
     "graia-broadcast>=0.18.2",
     "graia-saya>=0.0.17",
     # "avilla",
     # "launart"
+    "avilla-workspace @ git+https://github.com/GraiaProject/Avilla.git",
 ]
 requires-python = ">=3.9"
 readme = "README.md"
@@ -26,6 +26,7 @@ license = {text = "AGPL-3.0"}
 [tool.pdm]
 [tool.pdm.build]
 includes = ["arclet/alconna/avilla"]
+
 [tool.pdm.dev-dependencies]
 dev = [
     "nonechat>=0.2.0",
