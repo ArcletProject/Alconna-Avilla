@@ -1,7 +1,7 @@
 import inspect
 import re
 from functools import lru_cache
-from typing import Any, Callable, Hashable, Optional, Union
+from typing import Any, Callable, Hashable, Literal, Optional, Union
 
 from arclet.alconna.tools import AlconnaFormat
 from arclet.alconna.tools.construct import AlconnaString, FuncMounter, MountConfig
@@ -104,6 +104,7 @@ def alcommand(
     comp_session: Optional[CompConfig] = None,
     need_tome: bool = False,
     remove_tome: bool = False,
+    merge_reply: Union[bool, Literal["left", "right"]] = False,
 ) -> SchemaWrapper:
     """
     saya-util 形式的注册一个消息事件监听器并携带 AlconnaDispatcher
@@ -118,6 +119,7 @@ def alcommand(
         comp_session (CompConfig | None, optional): 是否使用补全会话
         need_tome (bool, optional): 是否需要 @ 机器人
         remove_tome (bool, optional): 是否移除 @ 机器人
+        merge_reply (bool | "left" | "right", optional): 是否将引用的原消息合并到指令内
     """
 
     def wrapper(func: Callable, buffer: dict[str, Any]) -> AlconnaSchema:
@@ -133,13 +135,13 @@ def alcommand(
             comp_session=comp_session,
             need_tome=need_tome,
             remove_tome=remove_tome,
+            merge_reply=merge_reply,
         )
         _filter = Filter().cx.client
         _dispatchers = buffer.setdefault("dispatchers", [])
         if patterns:
             _dispatchers.append(_filter.follows(*patterns))
-        if dispatcher:
-            _dispatchers.append(dispatcher)
+        _dispatchers.append(dispatcher)
         listen(MessageReceived)(func)
         return AlconnaSchema(dispatcher.command)
 
@@ -360,7 +362,18 @@ def funcommand(
     return wrapper
 
 
-element_mapping = {"Text": elements.Text}
+element_mapping = {
+    "Text": elements.Text,
+    "Notice": elements.Notice,
+    "At": elements.Notice,
+    "NoticeAll": elements.NoticeAll,
+    "Image": elements.Picture,
+    "Picture": elements.Picture,
+    "Audio": elements.Audio,
+    "Video": elements.Video,
+    "File": elements.File,
+    "Face": elements.Face,
+}
 
 
 class AvillaCommand(AlconnaString):
@@ -411,6 +424,7 @@ def Command(
     comp_session: Optional[CompConfig] = None,
     need_tome: bool = False,
     remove_tome: bool = False,
+    merge_reply: Union[bool, Literal["left", "right"]] = False,
 ):
     cmd = AvillaCommand(command, help_text, meta)
     cmd.buffer["$params"] = {
@@ -420,6 +434,7 @@ def Command(
         "comp_session": comp_session,
         "need_tome": need_tome,
         "remove_tome": remove_tome,
+        "merge_reply": merge_reply,
     }
     return cmd
 

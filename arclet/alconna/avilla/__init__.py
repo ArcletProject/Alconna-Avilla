@@ -19,13 +19,13 @@ from .model import Match as Match
 from .model import Query as Query
 from .saya import AlconnaBehaviour as AlconnaBehaviour
 from .saya import AlconnaSchema as AlconnaSchema
+from .tools import Command as Command
 from .tools import MatchPrefix as MatchPrefix
 from .tools import MatchSuffix as MatchSuffix
 from .tools import alcommand as alcommand
 from .tools import assign as assign
 from .tools import endswith as endswith
 from .tools import fetch_name as fetch_name
-from .tools import from_command as from_command
 from .tools import funcommand as funcommand
 from .tools import match_path as match_path
 from .tools import match_value as match_value

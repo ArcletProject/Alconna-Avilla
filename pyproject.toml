@@ -21,6 +21,10 @@ requires-python = ">=3.9"
 readme = "README.md"
 license = {text = "AGPL-3.0"}
 
+[project.entry-points."creart.creators"]
+alconna_avilla_behavior = "arclet.alconna.avilla.create:AlconnaBehaviorCreator"
+
+
 [tool]
 [tool.pdm]
 [tool.pdm.build]
@@ -30,6 +34,7 @@ includes = ["arclet/alconna/avilla"]
 dev = [
     "isort>=5.13.2",
     "black>=24.4.2",
+    "avilla-onebot-v11>=1.0.0a28",
 ]
 
 

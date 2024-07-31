@@ -1,7 +1,7 @@
 import asyncio
 import contextlib
 from atexit import register
-from typing import Any, ClassVar, Dict, Literal, Optional, get_args
+from typing import Any, ClassVar, Dict, Literal, Optional, Union, get_args
 
 from arclet.alconna.builtin import generate_duplication
 from arclet.alconna.completion import CompSession
@@ -10,7 +10,7 @@ from arclet.alconna.duplication import Duplication
 from arclet.alconna.exceptions import SpecialOptionTriggered
 from arclet.alconna.stub import ArgsStub, OptionStub, SubcommandStub
 from arclet.alconna.tools import AlconnaFormat
-from avilla.core import Context, Notice, Selector
+from avilla.core import Context, Message, Notice, Selector
 from avilla.standard.core.message import MessageReceived
 from creart import it
 from graia.amnesia.message import MessageChain
@@ -29,6 +29,7 @@ from arclet.alconna import Arparma, Empty, output_manager
 
 from .model import CommandResult, CompConfig, Header, Match, Query, TConvert, TSource
 
+reply_cache: "LRU[str, Message]" = LRU(64)
 result_cache: "Dict[int, LRU[str, asyncio.Future[Optional[CommandResult]]]]" = {}
 output_cache: "Dict[int, LRU[str, str]]" = {}
 
@@ -95,17 +96,30 @@ class AlconnaDispatcher(BaseDispatcher):
         return False
 
     def tome_remove(self, message: MessageChain, account: Selector):
-        if self.is_tome(message, account):
-            message = MessageChain(message.content.copy())
-            message.content.remove(message.get_first(Notice))
-            if message.content and isinstance(message.content[0], Text):
-                text = message.content[0].text.lstrip()  # type: ignore
-                if not text:
-                    message.content.pop(0)
-                else:
-                    message.content[0] = Text(text)
-            return message
+        message = MessageChain(message.content.copy())
+        message.content.remove(message.get_first(Notice))
+        if message.content and isinstance(message.content[0], Text):
+            text = message.content[0].text.lstrip()  # type: ignore
+            if not text:
+                message.content.pop(0)
+            else:
+                message.content[0] = Text(text)
         return message
+
+    async def reply_merge(self, message: MessageChain, source: MessageReceived):
+        if not source.message.reply:
+            return message
+        source_id = f"{source.message.id}@{source.context.account.route}"
+        if not (origin := reply_cache.get(source_id)):
+            try:
+                origin = await source.context.pull(Message, source.message.reply)
+            except NotImplementedError:
+                return message
+            else:
+                reply_cache[source_id] = origin
+        if self.merge_reply is True or self.merge_reply == "right":
+            return message.extend(origin.content, copy=True)
+        return origin.content.extend(message, copy=True)
 
     def completion_waiter(self, source: MessageReceived, priority: int = 15) -> Waiter:
         @Waiter.create_using_function(
@@ -115,7 +129,9 @@ class AlconnaDispatcher(BaseDispatcher):
         )
         async def waiter(event: MessageReceived):
             if event.context.client == source.context.client:
-                msg = self.tome_remove(event.message.content, event.context.self)
+                msg = event.message.content
+                if self.is_tome(msg, event.context.self):
+                    msg = self.tome_remove(msg, event.context.self)
                 return await self._waiter(msg)
 
         return waiter  # type: ignore
@@ -144,16 +160,19 @@ class AlconnaDispatcher(BaseDispatcher):
         message_converter: Optional[TConvert] = None,
         need_tome: bool = False,
         remove_tome: bool = False,
+        merge_reply: Union[bool, Literal["left", "right"]] = False,
     ):
         """
         构造 Alconna调度器
         Args:
             command (Alconna): Alconna实例
-            send_flag ("reply", "post", "stay"): 输出信息的发送方式
+            send_flag ("reply" | "post" | "stay"): 输出信息的发送方式
             skip_for_unmatch (bool): 当指令匹配失败时是否跳过对应的事件监听器, 默认为 True
             comp_session (CompConfig, optional): 补全会话配置, 不传入则不启用补全会话
+            message_converter: (TConvert, optional): 输出信息转换函数, 用于自定义将字符串转为消息链
             need_tome (bool, optional): 是否需要 @自己, 默认为 False
             remove_tome (bool, optional): 是否移除首部的 @自己，默认为 False
+            merge_reply (bool | "left" | "right", optional): 是否将引用的原消息合并到指令内
         """
         super().__init__()
         self.need_tome = need_tome
@@ -163,6 +182,7 @@ class AlconnaDispatcher(BaseDispatcher):
         self.comp_session = comp_session
         self.converter = message_converter or self.__class__.default_send_handler
         self.remove_tome = remove_tome
+        self.merge_reply = merge_reply
         self._interface = CompSession(self.command)
         result_cache.setdefault(command._hash, LRU(10))
         output_cache.setdefault(command._hash, LRU(10))
@@ -270,18 +290,22 @@ class AlconnaDispatcher(BaseDispatcher):
             dii.broadcast.postEvent(AlconnaOutputMessage(self.command, otype, output_text, source), source)
         return CommandResult(result, otype, None, source)
 
-    def lookup_source(
-        self, interface: DispatcherInterface[MessageReceived], need_tome: bool = True, remove_tome: bool = True
+    async def lookup_source(
+        self,
+        interface: DispatcherInterface[MessageReceived],
     ) -> MessageChain:
         message = interface.event.message.content
-        if need_tome and not self.is_tome(message, interface.event.context.self):
+        if self.merge_reply:
+            message = await self.reply_merge(message, interface.event)
+        is_tome = self.is_tome(message, interface.event.context.self)
+        if self.need_tome and not is_tome:
             raise ExecutionStop
-        if remove_tome:
+        if is_tome and self.remove_tome:
             return self.tome_remove(message, interface.event.context.self)
         return message
 
     async def beforeExecution(self, interface: DispatcherInterface[MessageReceived]):
-        message = self.lookup_source(interface, self.need_tome, self.remove_tome)
+        message = await self.lookup_source(interface)
         try:
             source = interface.event
         except LookupError:

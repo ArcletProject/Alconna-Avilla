@@ -5,7 +5,7 @@ from typing import Any
 from arclet.alconna._internal._argv import Argv
 from arclet.alconna.argv import argv_config, set_default_argv_type
 from graia.amnesia.message import MessageChain
-from graia.amnesia.message.element import Text
+from graia.amnesia.message.element import Element, Text
 
 
 class BaseMessageChainArgv(Argv[MessageChain]):
