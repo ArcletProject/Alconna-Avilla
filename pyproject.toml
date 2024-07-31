@@ -37,6 +37,10 @@ dev = [
     "avilla-onebot-v11>=1.0.0a28",
 ]
 
+[tool.pdm.scripts]
+pre_build = {call = "script:pre_build"}
+post_build = {call = "script:post_build"}
+
 
 [tool.black]
 line-length = 120
