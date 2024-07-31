@@ -1,0 +1,16 @@
+{
+  "$schema": "./.template.schema.json",
+  "scopes": [
+    {
+      "scope": "comp/graia",
+      "types": [
+        "tab",
+        "enter",
+        "exit",
+        "other",
+        "timeout",
+        "exited"
+      ]
+    }
+  ]
+}

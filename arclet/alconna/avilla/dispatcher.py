@@ -1,57 +1,55 @@
 from __future__ import annotations
 
 import asyncio
-import traceback
+import contextlib
 from atexit import register
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Literal, Optional, Union, get_args
-from weakref import WeakKeyDictionary
+from typing import Any, ClassVar, Dict, Literal, Optional, get_args
 
-from arclet.alconna import Arparma, Empty, output_manager
-from arclet.alconna.args import AllParam, Args
 from arclet.alconna.builtin import generate_duplication
 from arclet.alconna.completion import CompSession
 from arclet.alconna.core import Alconna
 from arclet.alconna.duplication import Duplication
 from arclet.alconna.exceptions import SpecialOptionTriggered
-from arclet.alconna.manager import command_manager
 from arclet.alconna.stub import ArgsStub, OptionStub, SubcommandStub
-from arclet.alconna.tools import AlconnaFormat, AlconnaString
-from arclet.alconna.typing import CommandMeta
-from avilla.core.context import Context
-from avilla.standard.core.message import MessageEdited, MessageReceived
+from arclet.alconna.tools import AlconnaFormat
+from avilla.core import Context, Notice, Selector
+from avilla.standard.core.message import MessageReceived
 from creart import it
 from graia.amnesia.message import MessageChain
 from graia.amnesia.message.element import Text
 from graia.broadcast.entities.dispatcher import BaseDispatcher
 from graia.broadcast.entities.event import Dispatchable
-from graia.broadcast.exceptions import ExecutionStop, PropagationCancelled
+from graia.broadcast.exceptions import ExecutionStop
 from graia.broadcast.interfaces.dispatcher import DispatcherInterface
-from graia.broadcast.interrupt import InterruptControl, Waiter
+from graia.broadcast.interrupt import InterruptControl
+from graia.broadcast.interrupt.waiter import Waiter
 from graia.broadcast.utilles import run_always_await
 from tarina import LRU, generic_isinstance, generic_issubclass, lang
 from tarina.generic import get_origin
 
-from .model import CommandResult, CompConfig, Header, Match, Query, TConvert
+from arclet.alconna import Arparma, Empty, output_manager
 
-if TYPE_CHECKING:
-    result_cache: WeakKeyDictionary[Alconna, LRU[str, asyncio.Future[Optional[CommandResult]]]]
-else:
-    result_cache = WeakKeyDictionary()
+from .model import CommandResult, CompConfig, Header, Match, Query, TConvert, TSource
 
-AvillaMessageEvent = Union[MessageEdited, MessageReceived]
+result_cache: "Dict[int, LRU[str, asyncio.Future[Optional[CommandResult]]]]" = {}
+output_cache: "Dict[int, LRU[str, str]]" = {}
+
 
 def get_future(alc: Alconna, source: str):
-    return result_cache[alc].get(source)
+    return result_cache[alc._hash].get(source)
 
 
 def set_future(alc: Alconna, source: str):
-    return result_cache[alc].setdefault(source, asyncio.Future())
+    return result_cache[alc._hash].setdefault(source, asyncio.Future())
 
 
 def clear():
     for lru in result_cache.values():
         lru.clear()
+    for dq in output_cache.values():
+        dq.clear()
     result_cache.clear()
+    output_cache.clear()
 
 
 register(clear)
@@ -63,16 +61,19 @@ class AlconnaOutputMessage(Dispatchable):
     如果触发的某个命令的可能输出 (帮助信息、模糊匹配、报错等), AlconnaDisptcher的send_flag为post时, 会发送该事件
     """
 
-    def __init__(self, command: Alconna, text: str, source: Dispatchable):
+    def __init__(self, command: Alconna, otype: str, text: str, source: Dispatchable):
         self.command = command
         self.output = text
+        self.otype = otype
         self.source_event = source
 
     class Dispatcher(BaseDispatcher):
-        @classmethod
-        async def catch(cls, interface: "DispatcherInterface[AlconnaOutputMessage]"):
+
+        async def catch(self, interface: "DispatcherInterface[AlconnaOutputMessage]"):
             if interface.name == "output" and interface.annotation == str:
                 return interface.event.output
+            if interface.name in ("otype", "output_type", "type"):
+                return interface.event.otype
             if isinstance(interface.annotation, Alconna):
                 return interface.event.command
             if issubclass(interface.annotation, type(interface.event.source_event)) or isinstance(
@@ -86,17 +87,29 @@ class AlconnaDispatcher(BaseDispatcher):
     def from_format(cls, command: str, args: Optional[Dict[str, Any]] = None):
         return cls(AlconnaFormat(command, args), send_flag="reply")
 
-    @classmethod
-    def from_command(cls, command: str, *options: str):
-        factory = AlconnaString(command)
-        for option in options:
-            factory.option(option)
-        return cls(factory.build(), send_flag="reply")
-
     default_send_handler: ClassVar[TConvert] = lambda _, x: MessageChain([Text(x)])
 
-    @staticmethod
-    def completion_waiter(source: AvillaMessageEvent, priority: int = 15) -> Waiter:
+    def is_tome(self, message: MessageChain, account: Selector):
+        if message.content and isinstance(message[0], Notice):
+            notice: Notice = message.get_first(Notice)
+            if notice.target.last_value == account.last_value:
+                return True
+        return False
+
+    def tome_remove(self, message: MessageChain, account: Selector):
+        if self.is_tome(message, account):
+            message = MessageChain(message.content.copy())
+            message.content.remove(message.get_first(Notice))
+            if message.content and isinstance(message.content[0], Text):
+                text = message.content[0].text.lstrip()  # type: ignore
+                if not text:
+                    message.content.pop(0)
+                else:
+                    message.content[0] = Text(text)
+            return message
+        return message
+
+    def completion_waiter(self, source: MessageReceived, priority: int = 15) -> Waiter:
         @Waiter.create_using_function(
             [MessageReceived],
             block_propagation=True,
@@ -104,24 +117,24 @@ class AlconnaDispatcher(BaseDispatcher):
         )
         async def waiter(event: MessageReceived):
             if event.context.client == source.context.client:
-                return event.message.content
+                msg = self.tome_remove(event.message.content, event.context.self)
+                return await self._waiter(msg)
 
         return waiter  # type: ignore
 
     async def send(
         self,
-        result: Arparma[MessageChain],
-        output_text: str | None = None,
-        source: AvillaMessageEvent | None = None,
+        output_type: str,
+        output_text: str | None,
+        source: MessageReceived,
     ) -> None:
         ctx: Context = source.context
         help_message: MessageChain = await run_always_await(
             self.converter,
-            str(result.error_info) if isinstance(result.error_info, SpecialOptionTriggered) else "help",
+            output_type,
             output_text,
         )
         await ctx.scene.send_message(help_message)
-
 
     def __init__(
         self,
@@ -131,6 +144,8 @@ class AlconnaDispatcher(BaseDispatcher):
         skip_for_unmatch: bool = True,
         comp_session: Optional[CompConfig] = None,
         message_converter: Optional[TConvert] = None,
+        need_tome: bool = False,
+        remove_tome: bool = False,
     ):
         """
         构造 Alconna调度器
@@ -139,132 +154,168 @@ class AlconnaDispatcher(BaseDispatcher):
             send_flag ("reply", "post", "stay"): 输出信息的发送方式
             skip_for_unmatch (bool): 当指令匹配失败时是否跳过对应的事件监听器, 默认为 True
             comp_session (CompConfig, optional): 补全会话配置, 不传入则不启用补全会话
+            need_tome (bool, optional): 是否需要 @自己, 默认为 False
+            remove_tome (bool, optional): 是否移除首部的 @自己，默认为 False
         """
         super().__init__()
+        self.need_tome = need_tome
         self.command = command
         self.send_flag = send_flag
         self.skip_for_unmatch = skip_for_unmatch
         self.comp_session = comp_session
         self.converter = message_converter or self.__class__.default_send_handler
-        result_cache.setdefault(command, LRU(10))
+        self.remove_tome = remove_tome
+        self._interface = CompSession(self.command)
+        result_cache.setdefault(command._hash, LRU(10))
+        output_cache.setdefault(command._hash, LRU(10))
+        self._comp_help = ""
+        self._waiter = lambda _: _
+        if self.comp_session is not None:
+            _tab = self.comp_session.get("tab") or ".tab"
+            _enter = self.comp_session.get("enter") or ".enter"
+            _exit = self.comp_session.get("exit") or ".exit"
+            disables = self.comp_session.get("disables", set())
+            hides = self.comp_session.get("hides", set())
+            hide_tabs = self.comp_session.get("hide_tabs", False)
+            if self.comp_session.get("lite", False):
+                hide_tabs = True
+                hides = {"tab", "enter", "exit"}
+            hides |= disables
+            if len(hides) < 3:
+                template = f"\n\n{{}}{{}}{{}}{lang.require('comp/graia', 'other')}\n"
+                self._comp_help = template.format(
+                    (lang.require("comp/graia", "tab").format(cmd=_tab) + "\n") if "tab" not in hides else "",
+                    (lang.require("comp/graia", "enter").format(cmd=_enter) + "\n") if "enter" not in hides else "",
+                    (lang.require("comp/graia", "exit").format(cmd=_exit) + "\n") if "exit" not in hides else "",
+                )
 
-    async def handle(self, source: Optional[Dispatchable], msg: MessageChain):
+            async def _(message: MessageChain):
+                msg = str(message).lstrip()
+                if msg.startswith(_exit) and "exit" not in disables:
+                    if msg == _exit:
+                        return False
+                    return lang.require("analyser", "param_unmatched").format(target=msg.replace(_exit, "", 1))
+
+                elif msg.startswith(_enter) and "enter" not in disables:
+                    if msg == _enter:
+                        return True
+                    return lang.require("analyser", "param_unmatched").format(target=msg.replace(_enter, "", 1))
+
+                elif msg.startswith(_tab) and "tab" not in disables:
+                    offset = msg.replace(_tab, "", 1).lstrip() or 1
+                    try:
+                        offset = int(offset)
+                    except ValueError:
+                        return lang.require("analyser", "param_unmatched").format(target=offset)
+                    else:
+                        self._interface.tab(offset)
+                        return f"* {self._interface.current()}" if hide_tabs else "\n".join(self._interface.lines())
+                else:
+                    return message
+
+            self._waiter = _
+        with contextlib.suppress(LookupError):
+            self.need_tome = self.need_tome
+            self.remove_tome = self.remove_tome
+
+    async def handle(self, source: Optional[MessageReceived], msg: MessageChain, dii: DispatcherInterface[TSource]):
         inc = it(InterruptControl)
-        interface = CompSession(self.command)
         if self.comp_session is None or not source:
             return self.command.parse(msg)  # type: ignore
         res = None
-        with interface:
+        with self._interface:
             res = self.command.parse(msg)  # type: ignore
         if res:
             return res
-        _tab = Alconna(
-            self.comp_session.get("tab", ".tab"), Args["offset", int, 1], [],
-            meta=CommandMeta(compact=True, hide=True)
-        )
-        _enter = Alconna(
-            self.comp_session.get("enter", ".enter"), Args["content", AllParam, []], [],
-            meta=CommandMeta(compact=True, hide=True)
-        )
-        _exit = Alconna(
-            self.comp_session.get("exit", ".exit"), [],
-            meta=CommandMeta(compact=True, hide=True)
-        )
-
-        def _clear():
-            command_manager.delete(_tab)
-            command_manager.delete(_enter)
-            command_manager.delete(_exit)
-            interface.clear()
-
-        while interface.available:
-            res = Arparma(self.command.path, msg, False, error_info=SpecialOptionTriggered("completion"))
-            await self.send(res, str(interface), source)
-            await self.send(
-                res,
-                f"{lang.require('comp/graia', 'tab').format(cmd=_tab.command)}\n"
-                f"{lang.require('comp/graia', 'enter').format(cmd=_enter.command)}\n"
-                f"{lang.require('comp/graia', 'exit').format(cmd=_exit.command)}",
-                source,
-            )
+        res = Arparma(self.command.path, msg, False, error_info=SpecialOptionTriggered("completion"))
+        waiter = self.completion_waiter(source, self.comp_session.get("priority", 10))
+        while self._interface.available:
+            await self.send("completion", f"{str(self._interface)}{self._comp_help}", source)
             while True:
-                waiter = self.completion_waiter(source ,self.comp_session.get('priority', 10))  # type: ignore
                 try:
-                    ans: MessageChain = await inc.wait(
-                        waiter, timeout=self.comp_session.get('timeout', 30)
-                    )
+                    ans = await inc.wait(waiter, timeout=self.comp_session.get("timeout", 60))
                 except asyncio.TimeoutError:
-                    _clear()
-                    await self.send(res, lang.require("comp/graia", "timeout"), source)
+                    await self.output(dii, res, lang.require("comp/graia", "timeout"), source)
+                    self._interface.exit()
                     return res
-                if _exit.parse(ans).matched:
-                    await self.send(res, lang.require("comp/graia", "exited"), source)
-                    _clear()
+                if ans is False:
+                    await self.output(dii, res, lang.require("comp/graia", "exited"), source)
+                    self._interface.exit()
                     return res
-                if (mat := _tab.parse(ans)).matched:
-                    interface.tab(mat.offset)
-                    lite = self.comp_session.get("lite", True)
-                    await self.send(res, interface.current() if lite else str(interface), source)
+                if isinstance(ans, str):
+                    await self.output(dii, res, ans, source)
                     continue
-                if (mat := _enter.parse(ans)).matched:
-                    content = list(mat.content)
-                    if not content or not content[0]:
-                        content = None
-                    try:
-                        with interface:
-                            res = interface.enter(content)
-                    except Exception as e:
-                        traceback.print_exc()
-                        await self.send(res, str(e), source)
-                        continue
-                    break
-                else:
-                    await self.send(res, interface.current(), source)
-        _clear()
+                _res = self._interface.enter(None if ans is True else ans)
+                if _res.result:
+                    res = _res.result
+                elif _res.exception and not isinstance(_res.exception, SpecialOptionTriggered):
+                    await self.output(dii, res, str(_res.exception), source)
+                break
+        self._interface.exit()
         return res
 
     async def output(
         self,
         dii: DispatcherInterface,
         result: Arparma[MessageChain],
-        output_text: Optional[str] = None,
-        source: Optional[Dispatchable] = None,
+        output_text: Optional[str],
+        source: Optional[MessageReceived],
     ):
+        otype = str(result.error_info) if isinstance(result.error_info, SpecialOptionTriggered) else "error"
         if not source or (result.matched or not output_text):
-            return CommandResult(result, None, source)
+            return CommandResult(result, otype, None, source)
         if self.send_flag == "stay":
-            return CommandResult(result, output_text, source)
+            return CommandResult(result, otype, output_text, source)
         if self.send_flag == "reply":
-            await self.send(result, output_text, source)
+            await self.send(otype, output_text, source)
         elif self.send_flag == "post":
-            dii.broadcast.postEvent(AlconnaOutputMessage(self.command, output_text, source), source)
-        return CommandResult(result, None, source)
+            dii.broadcast.postEvent(AlconnaOutputMessage(self.command, otype, output_text, source), source)
+        return CommandResult(result, otype, None, source)
 
-    async def beforeExecution(self, interface: DispatcherInterface[AvillaMessageEvent]):
-        message: MessageChain = interface.event.message.content
-        source = interface.event
-        if future := get_future(self.command, source.message.id if source else "_"):
+    def lookup_source(
+        self, interface: DispatcherInterface[MessageReceived], need_tome: bool = True, remove_tome: bool = True
+    ) -> MessageChain:
+        message = interface.event.message.content
+        if need_tome and not self.is_tome(message, interface.event.context.self):
+            raise ExecutionStop
+        if remove_tome:
+            return self.tome_remove(message, interface.event.context.self)
+        return message
+
+    async def beforeExecution(self, interface: DispatcherInterface[MessageReceived]):
+        message = self.lookup_source(interface, self.need_tome, self.remove_tome)
+        try:
+            source = interface.event
+        except LookupError:
+            source = None
+        source_id = f"{source.message.id}@{source.context.account.route}" if source else "_"
+        if future := get_future(self.command, source_id):
             await future
             if not (_property := future.result()):
                 raise ExecutionStop
         else:
-            fut = set_future(self.command, source.message.id if source else "_")
+            fut = set_future(self.command, source_id)
             with output_manager.capture(self.command.name) as cap:
                 output_manager.set_action(lambda x: x, self.command.name)
                 try:
-                    _res = await self.handle(source, message)
+                    _res = await self.handle(source, message, interface)
                 except Exception as e:
                     _res = Arparma(self.command.path, message, False, error_info=e)
                 may_help_text: Optional[str] = cap.get("output", None)
-            if not may_help_text and not _res.matched and ((not _res.head_matched) or self.skip_for_unmatch):
+            if not _res.head_matched:
+                fut.set_result(None)
+                raise ExecutionStop
+            if not may_help_text and not _res.matched and self.skip_for_unmatch:
                 fut.set_result(None)
                 raise ExecutionStop
             if not may_help_text and _res.error_info:
                 may_help_text = repr(_res.error_info)
+            if may_help_text is not None:
+                output_cache[self.command._hash][source_id] = may_help_text
             _property = await self.output(interface, _res, may_help_text, source)
             fut.set_result(_property)
         if not _property.result.matched and not _property.output:
-            raise PropagationCancelled
+            raise ExecutionStop
         interface.local_storage["alconna_result"] = _property
         return
 

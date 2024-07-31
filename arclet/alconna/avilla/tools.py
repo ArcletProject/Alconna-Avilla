@@ -1,48 +1,30 @@
 from __future__ import annotations
 
 import inspect
+import re
 from functools import lru_cache
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, Hashable
 
-from arclet.alconna import Alconna
-from arclet.alconna.tools import AlconnaFormat, AlconnaString
-from arclet.alconna.tools.construct import FuncMounter
-from avilla.core.context import Context
-from avilla.core.elements import Notice
+from arclet.alconna.tools import AlconnaFormat
+from arclet.alconna.tools.construct import FuncMounter, MountConfig
+from arclet.alconna.typing import ShortcutArgs
+from avilla.core import Context, MessageReceived, Notice, Summary
 from avilla.core.tools.filter import Filter
-from avilla.standard.core.message import MessageEdited, MessageReceived
-from avilla.standard.core.profile import Summary
-from graia.amnesia.message import Element, MessageChain
-from graia.amnesia.message.element import Text
-from graia.broadcast import (
-    Decorator,
-    DecoratorInterface,
-)
+from graia.amnesia.message import Element, MessageChain, Text
+from graia.broadcast import Decorator, DecoratorInterface, DispatcherInterface
 from graia.broadcast.builtin.decorators import Depend
 from graia.broadcast.builtin.derive import Derive
 from graia.broadcast.exceptions import ExecutionStop
-from graia.broadcast.interfaces.dispatcher import DispatcherInterface
-from graia.saya.factory import (
-    BufferModifier,
-    SchemaWrapper,
-    buffer_modifier,
-    ensure_buffer,
-    factory,
-)
-from nepattern import AllParam, BasePattern, Empty, type_parser
+from graia.saya.builtins.broadcast.shortcut import T_Callable, listen
+from graia.saya.factory import BufferModifier, SchemaWrapper, buffer_modifier, ensure_buffer, factory
+from nepattern import BasePattern, Empty, MatchMode, parser
 from tarina import gen_subclass, is_awaitable
-from typing_extensions import NotRequired
+
+from arclet.alconna import Alconna, AllParam
 
 from .dispatcher import AlconnaDispatcher, CommandResult
 from .model import CompConfig
 from .saya import AlconnaSchema
-from .utils import T_Callable, listen
-
-
-class GraiaShortcutArgs(TypedDict):
-    command: MessageChain
-    args: NotRequired[list[Any]]
-    fuzzy: NotRequired[bool]
 
 
 def fetch_name(path: str = "name"):
@@ -56,13 +38,12 @@ def fetch_name(path: str = "name"):
         arp = result.result
         if t := arp.all_matched_args.get(path, None):
             return (
-                t.target.pattern.get("display")
-                or (await ctx.pull(Summary, target=result.source.context.client)).name
+                t.target.pattern.get("display") or (await ctx.pull(Summary, target=ctx.client)).name
                 if isinstance(t, Notice)
                 else t
             )
         else:
-            return (await ctx.pull(Summary, target=result.source.context.client)).name
+            return (await ctx.pull(Summary, target=ctx.client)).name
 
     return Depend(__wrapper__)
 
@@ -104,9 +85,7 @@ def match_value(path: str, value: Any, or_not: bool = False):
     return Depend(__wrapper__)
 
 
-def shortcuts(
-    mapping: dict[str, GraiaShortcutArgs] | None = None, **kwargs: GraiaShortcutArgs
-):
+def shortcuts(mapping: dict[str, ShortcutArgs] | None = None, **kwargs: ShortcutArgs):
     def wrapper(func: T_Callable) -> T_Callable:
         kwargs.update(mapping or {})
         if hasattr(func, "__alc_shortcuts__"):
@@ -121,12 +100,12 @@ def shortcuts(
 @factory
 def alcommand(
     alconna: Alconna | str,
-    guild: bool = True,
-    private: bool = True,
     send_error: bool = False,
     post: bool = False,
     patterns: list[str] | None = None,
     comp_session: CompConfig | None = None,
+    need_tome: bool = False,
+    remove_tome: bool = False,
 ) -> SchemaWrapper:
     """
     saya-util 形式的注册一个消息事件监听器并携带 AlconnaDispatcher
@@ -135,67 +114,36 @@ def alcommand(
 
     Args:
         alconna (Alconna | str): 使用的 Alconna 命令
-        guild (bool, optional): 命令是否群聊可用
-        private (bool, optional): 命令是否私聊可用
         send_error (bool, optional): 是否发送错误信息
         post (bool, optional): 是否以事件发送输出信息
         patterns (list[str] | None, optional): 在可能的以 Avilla 为基础框架时使用的 selector 匹配模式
         comp_session (CompConfig | None, optional): 是否使用补全会话
+        need_tome (bool, optional): 是否需要 @ 机器人
+        remove_tome (bool, optional): 是否移除 @ 机器人
     """
-    if isinstance(alconna, str):
-        if not alconna.strip():
-            raise ValueError(alconna)
-        parts = alconna.split(";")
-        _factory = AlconnaString(parts[0])
-        for part in parts[1:]:
-            _head = part.split(" ", 1)[0]
-            _factory.option(_head.lstrip(" ").lstrip("-"), part.lstrip())
-        alconna = _factory.build()
-    dispatcher = AlconnaDispatcher(
-        alconna,
-        send_flag="post" if post else "reply",  # type: ignore
-        skip_for_unmatch=not send_error,
-        comp_session=comp_session,
-    )
 
     def wrapper(func: Callable, buffer: dict[str, Any]) -> AlconnaSchema:
+        if isinstance(alconna, str):
+            custom_args = {v.name: v.annotation for v in inspect.signature(func).parameters.values()}
+            cmd = AlconnaFormat(alconna, custom_args)
+        else:
+            cmd = alconna
+        dispatcher = AlconnaDispatcher(
+            cmd,
+            send_flag="post" if post else "reply",  # type: ignore
+            skip_for_unmatch=not send_error,
+            comp_session=comp_session,
+            need_tome=need_tome,
+            remove_tome=remove_tome,
+        )
         _filter = Filter().cx.client
         _dispatchers = buffer.setdefault("dispatchers", [])
         if patterns:
             _dispatchers.append(_filter.follows(*patterns))
         if dispatcher:
             _dispatchers.append(dispatcher)
-        listen(MessageReceived, MessageEdited)(func)
+        listen(MessageReceived)(func)
         return AlconnaSchema(dispatcher.command)
-
-    return wrapper
-
-
-@factory
-def from_command(
-    format_command: str,
-    args: dict[str, type | BasePattern] | None = None,
-    post: bool = False,
-) -> SchemaWrapper:
-    """
-    saya-util 形式的仅注入一个 AlconnaDispatcher, 事件监听部分自行处理
-
-    Args:
-        format_command: 格式化命令字符串
-        args: 格式化填入内容
-        post: 是否以事件发送输出信息
-    """
-
-    def wrapper(func: Callable, buffer: dict[str, Any]):
-        custom_args = {
-            v.name: v.annotation for v in inspect.signature(func).parameters.values()
-        }
-        custom_args.update(args or {})
-        cmd = AlconnaFormat(format_command, custom_args)
-        buffer.setdefault("dispatchers", []).append(
-            AlconnaDispatcher(cmd, send_flag="post" if post else "reply")  # type: ignore
-        )
-        return AlconnaSchema(cmd)
 
     return wrapper
 
@@ -235,6 +183,22 @@ def _get_filter_out() -> list[type[Element]]:
     return res
 
 
+def prefixed(pat: BasePattern):
+    if pat.mode not in (MatchMode.REGEX_MATCH, MatchMode.REGEX_CONVERT):
+        return pat
+    new_pat = pat.copy()
+    new_pat.regex_pattern = re.compile(f"^{new_pat.pattern}")
+    return new_pat
+
+
+def suffixed(pat: BasePattern):
+    if pat.mode not in (MatchMode.REGEX_MATCH, MatchMode.REGEX_CONVERT):
+        return pat
+    new_pat = pat.copy()
+    new_pat.regex_pattern = re.compile(f"{new_pat.pattern}$")
+    return new_pat
+
+
 class MatchPrefix(Decorator, Derive[MessageChain]):
     pre = True
 
@@ -246,23 +210,19 @@ class MatchPrefix(Decorator, Derive[MessageChain]):
             prefix: 检测的前缀, 支持格式有 a|b , ['a', At(...)] 等
             extract: 是否为提取模式, 默认为 False
         """
-        pattern = type_parser(prefix)
+        pattern = BasePattern(prefix, mode=MatchMode.REGEX_MATCH) if isinstance(prefix, str) else parser(prefix)
         if pattern in (AllParam, Empty):
             raise ValueError(prefix)
-        self.pattern = pattern.prefixed()
+        self.pattern = prefixed(pattern)
         self.extract = extract
 
-    async def target(self, interface: DecoratorInterface):
+    async def target(self, interface: DecoratorInterface):  # type: ignore
         return await self(
-            await interface.dispatcher_interface.lookup_param(
-                "message_chain", MessageChain, None
-            ),
+            await interface.dispatcher_interface.lookup_param("message_chain", MessageChain, None),
             interface.dispatcher_interface,
         )
 
-    async def __call__(
-        self, chain: MessageChain, interface: DispatcherInterface
-    ) -> MessageChain:
+    async def __call__(self, chain: MessageChain, interface: DispatcherInterface) -> MessageChain:
         header = chain.include(*_get_filter_out())
         rest: MessageChain = chain.exclude(*_get_filter_out())
         if not rest.content:
@@ -292,23 +252,19 @@ class MatchSuffix(Decorator, Derive[MessageChain]):
             suffix: 检测的前缀, 支持格式有 a|b , ['a', At(...)] 等
             extract: 是否为提取模式, 默认为 False
         """
-        pattern = type_parser(suffix)
+        pattern = BasePattern(suffix, mode=MatchMode.REGEX_MATCH) if isinstance(suffix, str) else parser(suffix)
         if pattern in (AllParam, Empty):
             raise ValueError(suffix)
-        self.pattern = pattern.suffixed()
+        self.pattern = suffixed(pattern)
         self.extract = extract
 
-    async def target(self, interface: DecoratorInterface):
+    async def target(self, interface: DecoratorInterface):  # type: ignore
         return await self(
-            await interface.dispatcher_interface.lookup_param(
-                "message_chain", MessageChain, None
-            ),
+            await interface.dispatcher_interface.lookup_param("message_chain", MessageChain, None),
             interface.dispatcher_interface,
         )
 
-    async def __call__(
-        self, chain: MessageChain, interface: DispatcherInterface
-    ) -> MessageChain:
+    async def __call__(self, chain: MessageChain, interface: DispatcherInterface) -> MessageChain:
         header = chain.include(*_get_filter_out())
         rest: MessageChain = chain.exclude(*_get_filter_out())
         if not rest.content:
@@ -328,9 +284,7 @@ class MatchSuffix(Decorator, Derive[MessageChain]):
 
 
 @buffer_modifier
-def startswith(
-    prefix: Any, include: bool = False, bind: str | None = None
-) -> BufferModifier:
+def startswith(prefix: Any, include: bool = False, bind: str | None = None) -> BufferModifier:
     """
     MatchPrefix 的 shortcut形式
 
@@ -351,9 +305,7 @@ def startswith(
 
 
 @buffer_modifier
-def endswith(
-    suffix: Any, include: bool = False, bind: str | None = None
-) -> BufferModifier:
+def endswith(suffix: Any, include: bool = False, bind: str | None = None) -> BufferModifier:
     """
     MatchSuffix 的 shortcut形式
 
@@ -376,11 +328,9 @@ def endswith(
 def funcommand(
     name: str | None = None,
     prefixes: list[str] | None = None,
-    guild: bool = True,
-    private: bool = True,
     patterns: list[str] | None = None,
 ):
-    _config = {"raise_exception": False}
+    _config: MountConfig = {"raise_exception": False}
     if name:
         _config["command"] = name
     if prefixes:
@@ -390,14 +340,14 @@ def funcommand(
         buffer = ensure_buffer(func)
         alc = FuncMounter(func, config=_config)
 
-        async def _wrapper(ctx: Context, message: MessageChain):
+        async def listener(ctx: Context, message: MessageChain):
             try:
-                arp, res = alc.exec(message)
+                arp = alc.parse(message)
             except Exception as e:
                 await ctx.scene.send_message(str(e))
                 return
-            if arp.matched:
-                if is_awaitable(res):
+            if arp.matched and (res := alc.exec_result.get(func.__name__)):
+                if isinstance(res, Hashable) and is_awaitable(res):
                     res = await res
                 if isinstance(res, (str, MessageChain)):
                     await ctx.scene.send_message(res)
@@ -406,7 +356,7 @@ def funcommand(
         _dispatchers = buffer.setdefault("dispatchers", [])
         if patterns:
             _dispatchers.append(_filter.follows(*patterns))
-        listen(MessageReceived, MessageEdited)(_wrapper)
+        listen(MessageReceived)(listener)
         return func
 
     return wrapper
@@ -417,7 +367,6 @@ __all__ = [
     "match_path",
     "alcommand",
     "match_value",
-    "from_command",
     "shortcuts",
     "assign",
     "startswith",

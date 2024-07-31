@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any 
+from typing import Any
 
 from arclet.alconna.core import Alconna
 from arclet.alconna.manager import command_manager
@@ -20,9 +20,7 @@ class AlconnaSchema(BaseSchema):
 
     @classmethod
     def from_(cls, command: str, flag: str = "reply") -> AlconnaSchema:
-        return cls(
-            AlconnaDispatcher(AlconnaFormat(command), send_flag=flag)  # type: ignore
-        )
+        return cls(AlconnaDispatcher(AlconnaFormat(command), send_flag=flag))  # type: ignore
 
     def record(self, func: Any):
         command: Alconna

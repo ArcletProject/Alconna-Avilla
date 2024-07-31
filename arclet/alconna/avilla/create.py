@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING 
-from creart import AbstractCreator, CreateTargetInfo, it, exists_module, mixin
+from typing import TYPE_CHECKING
+
+from creart import AbstractCreator, CreateTargetInfo, exists_module, it, mixin
 
 if TYPE_CHECKING:
-    from arclet.alconna.graia.saya import AlconnaBehaviour
+    from arclet.alconna.avilla.saya import AlconnaBehaviour
 
 
 class AlconnaBehaviorCreator(AbstractCreator):
     targets = (
         CreateTargetInfo(
-            module="arclet.alconna.graia.saya",
+            module="arclet.alconna.avilla.saya",
             identify="AlconnaBehaviour",
             humanized_name="Saya Behavior of Alconna",
             description=(
@@ -20,13 +21,13 @@ class AlconnaBehaviorCreator(AbstractCreator):
             author=["ArcletProject@github"],
         ),
     )
-    from graia.creart.broadcast import BroadcastCreator
-    from graia.creart.saya import SayaCreator
+    from graia.broadcast.creator import BroadcastCreator
+    from graia.saya.creator import SayaCreator
 
     @staticmethod
     @mixin(BroadcastCreator, SayaCreator)
     def available() -> bool:
-        return exists_module("arclet.alconna.graia.saya")
+        return exists_module("arclet.alconna.avilla.saya")
 
     @staticmethod
     def create(create_type: type[AlconnaBehaviour]) -> AlconnaBehaviour:

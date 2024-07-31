@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypeVar, Generic, TypedDict, Literal, Callable, Awaitable, Union
+from typing import Awaitable, Callable, Generic, Literal, Set, TypedDict, TypeVar, Union
+from typing_extensions import NotRequired, TypeAlias
+
+from graia.amnesia.message import MessageChain
+from graia.broadcast.entities.event import Dispatchable
 
 from arclet.alconna import Arparma, Empty
-from typing_extensions import NotRequired, TypeAlias
-from graia.amnesia.message import MessageChain
 
-TSource = TypeVar("TSource")
+TSource = TypeVar("TSource", bound=Dispatchable)
 T = TypeVar("T")
-OutType = Literal["help", "shortcut", "completion"]
+OutType = Literal["help", "shortcut", "completion", "error"]
 TConvert: TypeAlias = Callable[[OutType, str], Union[MessageChain, Awaitable[MessageChain]]]
 
 
@@ -23,6 +25,7 @@ class Query(Generic[T]):
 
     path (str): 查询路径
     """
+
     result: T
     available: bool
     path: str
@@ -45,6 +48,7 @@ class Match(Generic[T]):
 
     available (bool): 匹配状态
     """
+
     result: T
     available: bool
 
@@ -52,9 +56,11 @@ class Match(Generic[T]):
 @dataclass
 class CommandResult(Generic[TSource]):
     """对解析结果的封装"""
+
     result: Arparma
+    output_type: str
     output: str | None = field(default=None)
-    source: TSource = field(default=None)
+    source: TSource | None = field(default=None)
 
 
 @dataclass
@@ -66,14 +72,18 @@ class Header:
 
     available (bool): 匹配状态
     """
+
     result: dict
     available: bool
 
 
 class CompConfig(TypedDict):
-    priority: NotRequired[int]
     tab: NotRequired[str]
     enter: NotRequired[str]
     exit: NotRequired[str]
     timeout: NotRequired[int]
+    priority: NotRequired[int]
+    hide_tabs: NotRequired[bool]
+    hides: NotRequired[Set[Literal["tab", "enter", "exit"]]]
+    disables: NotRequired[Set[Literal["tab", "enter", "exit"]]]
     lite: NotRequired[bool]

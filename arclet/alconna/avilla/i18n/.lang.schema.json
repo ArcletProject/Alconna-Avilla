@@ -1,0 +1,47 @@
+{
+  "title": "Lang Schema",
+  "description": "Schema for lang file",
+  "type": "object",
+  "minProperties": 2,
+  "maxProperties": 2,
+  "properties": {
+    "comp/graia": {
+      "title": "Comp/graia",
+      "description": "Scope 'comp/graia' of lang item",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tab": {
+          "title": "tab",
+          "description": "value of lang item type 'tab'",
+          "type": "string"
+        },
+        "enter": {
+          "title": "enter",
+          "description": "value of lang item type 'enter'",
+          "type": "string"
+        },
+        "exit": {
+          "title": "exit",
+          "description": "value of lang item type 'exit'",
+          "type": "string"
+        },
+        "other": {
+          "title": "other",
+          "description": "value of lang item type 'other'",
+          "type": "string"
+        },
+        "timeout": {
+          "title": "timeout",
+          "description": "value of lang item type 'timeout'",
+          "type": "string"
+        },
+        "exited": {
+          "title": "exited",
+          "description": "value of lang item type 'exited'",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,22 +1,21 @@
 [project]
 name = "arclet-alconna-avilla"
-version = "0.15.0"
+version = "0.19.0"
 description = "Support Alconna for GraiaProject/Avilla"
 authors = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
 ]
 dependencies = [
-    "arclet-alconna<2.0.0, >=1.7.14",
-    "arclet-alconna-tools<0.7.0, >=0.6.3",
-    "tarina>=0.3.3",
-    "nepattern<0.6.0, >=0.5.10",
-    "creart-graia>=0.1.5",
-    "creart>=0.2.1",
+    "arclet-alconna<2.0.0, >=1.8.12",
+    "arclet-alconna-tools<0.8.0, >=0.7.4",
+    "tarina>=0.5.0",
+    "nepattern<0.8.0, >=0.7.3",
+    "graia-amnesia>=0.5.0",
     "graia-broadcast>=0.18.2",
     "graia-saya>=0.0.17",
-    # "avilla",
-    # "launart"
-    "avilla-workspace @ git+https://github.com/GraiaProject/Avilla.git",
+    "avilla-core>=1.0.0a20",
+    "launart>=0.5.0",
+    "creart>=0.3.0",
 ]
 requires-python = ">=3.9"
 readme = "README.md"
@@ -29,5 +28,26 @@ includes = ["arclet/alconna/avilla"]
 
 [tool.pdm.dev-dependencies]
 dev = [
-    "nonechat>=0.2.0",
+    "isort>=5.13.2",
+    "black>=24.4.2",
 ]
+
+
+[tool.black]
+line-length = 120
+target-version = ["py39", "py310", "py311", "py312"]
+include = '\.pyi?$'
+extend-exclude = '''
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+skip_gitignore = true
+extra_standard_library = ["typing_extensions"]
+
+[tool.pyright]
+pythonVersion = "3.9"
+pythonPlatform = "All"
+typeCheckingMode = "basic"
+disableBytesTypePromotions = true

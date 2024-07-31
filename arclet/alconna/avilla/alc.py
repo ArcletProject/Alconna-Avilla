@@ -1,19 +1,11 @@
 from __future__ import annotations
 
 from typing import Any, Callable
-from tarina import init_spec
-from graia.saya.factory import BufferModifier, SchemaWrapper, buffer_modifier, factory
 
-from arclet.alconna import (
-    Alconna,
-    Args,
-    Arg,
-    CommandMeta,
-    Namespace,
-    Option,
-    Subcommand,
-    config,
-)
+from graia.saya.factory import BufferModifier, SchemaWrapper, buffer_modifier, factory
+from tarina import init_spec
+
+from arclet.alconna import Alconna, Arg, Args, CommandMeta, Namespace, Option, Subcommand, config
 
 from .dispatcher import AlconnaDispatcher
 from .saya import AlconnaSchema

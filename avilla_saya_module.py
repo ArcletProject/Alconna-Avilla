@@ -1,8 +1,9 @@
 from avilla.console.element import Emoji, Markdown
 from avilla.core import Context, MessageChain, MessageReceived, Text
 from tarina import lang
-from arclet.alconna import Alconna, Args, Option, Subcommand, Arparma, MultiVar, Field, CommandMeta
-from arclet.alconna.avilla import Match, alcommand, startswith, assign, funcommand
+
+from arclet.alconna import Alconna, Args, Arparma, CommandMeta, Field, MultiVar, Option, Subcommand
+from arclet.alconna.avilla import Match, alcommand, assign, funcommand, startswith
 from arclet.alconna.avilla.utils import listen
 
 
@@ -85,6 +86,7 @@ launart.launch_blocking(loop=broadcast.loop)
 async def on_message_received4(ctx: Context, emoji: Match[str]):
     await ctx.scene.send_message([Emoji(emoji.result), " | this is apple -> ", Emoji("apple")])
 
+
 tt = Alconna(
     "/pip",
     Subcommand(
@@ -124,19 +126,9 @@ code = Alconna(
 )
 code.shortcut(
     "命令概览",
-    {
-        "command": MessageChain(
-            [Text("执行\nfrom arclet.alconna import command_manager\nprint(command_manager)")]
-        )
-    }
+    {"command": MessageChain([Text("执行\nfrom arclet.alconna import command_manager\nprint(command_manager)")])},
 )
-code.shortcut(
-    "echo",
-    {
-        "command": MessageChain(
-            [Text("执行 --pure-text\nprint(\\'{*}\\')")])
-    }
-)
+code.shortcut("echo", {"command": MessageChain([Text("执行 --pure-text\nprint(\\'{*}\\')")])})
 
 
 @alcommand(code)
