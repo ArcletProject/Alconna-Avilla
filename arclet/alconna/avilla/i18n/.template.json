@@ -2,14 +2,19 @@
   "$schema": "./.template.schema.json",
   "scopes": [
     {
-      "scope": "comp/graia",
+      "scope": "completion",
       "types": [
-        "tab",
-        "enter",
-        "exit",
-        "other",
-        "timeout",
-        "exited"
+        {
+          "subtype": "avilla",
+          "types": [
+            "tab",
+            "enter",
+            "exit",
+            "other",
+            "timeout",
+            "exited"
+          ]
+        }
       ]
     }
   ]

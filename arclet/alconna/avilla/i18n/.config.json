@@ -1,9 +1,9 @@
 {
   "default": "zh-CN",
   "frozen": [
-    "comp/graia"
+    "completion.avilla"
   ],
   "require": [
-    "comp/graia"
+    "completion.avilla"
   ]
 }

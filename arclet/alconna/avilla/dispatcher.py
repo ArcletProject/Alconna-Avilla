@@ -22,11 +22,12 @@ from graia.broadcast.interfaces.dispatcher import DispatcherInterface
 from graia.broadcast.interrupt import InterruptControl
 from graia.broadcast.interrupt.waiter import Waiter
 from graia.broadcast.utilles import run_always_await
-from tarina import LRU, generic_isinstance, generic_issubclass, lang
+from tarina import LRU, generic_isinstance, generic_issubclass
 from tarina.generic import get_origin
 
 from arclet.alconna import Arparma, Empty, output_manager
 
+from .i18n import Lang, lang
 from .model import CommandResult, CompConfig, Header, Match, Query, TConvert, TSource
 
 reply_cache: "LRU[str, Message]" = LRU(64)
@@ -200,11 +201,11 @@ class AlconnaDispatcher(BaseDispatcher):
                 hides = {"tab", "enter", "exit"}
             hides |= disables
             if len(hides) < 3:
-                template = f"\n\n{{}}{{}}{{}}{lang.require('comp/graia', 'other')}\n"
+                template = f"\n\n{{}}{{}}{{}}{Lang.completion.avilla.other()}\n"
                 self._comp_help = template.format(
-                    (lang.require("comp/graia", "tab").format(cmd=_tab) + "\n") if "tab" not in hides else "",
-                    (lang.require("comp/graia", "enter").format(cmd=_enter) + "\n") if "enter" not in hides else "",
-                    (lang.require("comp/graia", "exit").format(cmd=_exit) + "\n") if "exit" not in hides else "",
+                    (Lang.completion.avilla.tab(cmd=_tab) + "\n") if "tab" not in hides else "",
+                    (Lang.completion.avilla.enter(cmd=_enter) + "\n") if "enter" not in hides else "",
+                    (Lang.completion.avilla.exit(cmd=_exit) + "\n") if "exit" not in hides else "",
                 )
 
             async def _(message: MessageChain):
@@ -253,11 +254,11 @@ class AlconnaDispatcher(BaseDispatcher):
                 try:
                     ans = await inc.wait(waiter, timeout=self.comp_session.get("timeout", 60))
                 except asyncio.TimeoutError:
-                    await self.output(dii, res, lang.require("comp/graia", "timeout"), source)
+                    await self.output(dii, res, Lang.completion.avilla.timeout(), source)
                     self._interface.exit()
                     return res
                 if ans is False:
-                    await self.output(dii, res, lang.require("comp/graia", "exited"), source)
+                    await self.output(dii, res, Lang.completion.avilla.exited(), source)
                     self._interface.exit()
                     return res
                 if isinstance(ans, str):
