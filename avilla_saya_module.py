@@ -1,10 +1,10 @@
 from avilla.console.element import Emoji, Markdown
 from avilla.core import Context, MessageChain, MessageReceived, Text
+from graia.saya.builtins.broadcast.shortcut import listen
 from tarina import lang
 
 from arclet.alconna import Alconna, Args, Arparma, CommandMeta, Field, MultiVar, Option, Subcommand
 from arclet.alconna.avilla import Match, alcommand, assign, funcommand, startswith
-from arclet.alconna.avilla.utils import listen
 
 
 @alcommand(Alconna("/lang", Args["lang", ["zh_CN", "en_US"]]))
@@ -126,9 +126,9 @@ code = Alconna(
 )
 code.shortcut(
     "命令概览",
-    {"command": MessageChain([Text("执行\nfrom arclet.alconna import command_manager\nprint(command_manager)")])},
+    {"command": "执行\nfrom arclet.alconna import command_manager\nprint(command_manager)"},
 )
-code.shortcut("echo", {"command": MessageChain([Text("执行 --pure-text\nprint(\\'{*}\\')")])})
+code.shortcut("echo", {"command": "执行 --pure-text\nprint(\\'{*}\\')"})
 
 
 @alcommand(code)

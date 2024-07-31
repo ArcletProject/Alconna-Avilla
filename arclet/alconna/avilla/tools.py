@@ -1,14 +1,12 @@
-from __future__ import annotations
-
 import inspect
 import re
 from functools import lru_cache
-from typing import Any, Callable, Hashable
+from typing import Any, Callable, Hashable, Optional, Union
 
 from arclet.alconna.tools import AlconnaFormat
-from arclet.alconna.tools.construct import FuncMounter, MountConfig
-from arclet.alconna.typing import ShortcutArgs
-from avilla.core import Context, MessageReceived, Notice, Summary
+from arclet.alconna.tools.construct import AlconnaString, FuncMounter, MountConfig
+from arclet.alconna.typing import CommandMeta, ShortcutArgs
+from avilla.core import Context, MessageReceived, Notice, Summary, elements
 from avilla.core.tools.filter import Filter
 from graia.amnesia.message import Element, MessageChain, Text
 from graia.broadcast import Decorator, DecoratorInterface, DispatcherInterface
@@ -20,7 +18,7 @@ from graia.saya.factory import BufferModifier, SchemaWrapper, buffer_modifier, e
 from nepattern import BasePattern, Empty, MatchMode, parser
 from tarina import gen_subclass, is_awaitable
 
-from arclet.alconna import Alconna, AllParam
+from arclet.alconna import Alconna, AllParam, Namespace
 
 from .dispatcher import AlconnaDispatcher, CommandResult
 from .model import CompConfig
@@ -85,7 +83,7 @@ def match_value(path: str, value: Any, or_not: bool = False):
     return Depend(__wrapper__)
 
 
-def shortcuts(mapping: dict[str, ShortcutArgs] | None = None, **kwargs: ShortcutArgs):
+def shortcuts(mapping: Optional[dict[str, ShortcutArgs]] = None, **kwargs: ShortcutArgs):
     def wrapper(func: T_Callable) -> T_Callable:
         kwargs.update(mapping or {})
         if hasattr(func, "__alc_shortcuts__"):
@@ -99,11 +97,11 @@ def shortcuts(mapping: dict[str, ShortcutArgs] | None = None, **kwargs: Shortcut
 
 @factory
 def alcommand(
-    alconna: Alconna | str,
+    alconna: Union[Alconna, str],
     send_error: bool = False,
     post: bool = False,
-    patterns: list[str] | None = None,
-    comp_session: CompConfig | None = None,
+    patterns: Optional[list[str]] = None,
+    comp_session: Optional[CompConfig] = None,
     need_tome: bool = False,
     remove_tome: bool = False,
 ) -> SchemaWrapper:
@@ -284,7 +282,7 @@ class MatchSuffix(Decorator, Derive[MessageChain]):
 
 
 @buffer_modifier
-def startswith(prefix: Any, include: bool = False, bind: str | None = None) -> BufferModifier:
+def startswith(prefix: Any, include: bool = False, bind: Optional[str] = None) -> BufferModifier:
     """
     MatchPrefix 的 shortcut形式
 
@@ -305,7 +303,7 @@ def startswith(prefix: Any, include: bool = False, bind: str | None = None) -> B
 
 
 @buffer_modifier
-def endswith(suffix: Any, include: bool = False, bind: str | None = None) -> BufferModifier:
+def endswith(suffix: Any, include: bool = False, bind: Optional[str] = None) -> BufferModifier:
     """
     MatchSuffix 的 shortcut形式
 
@@ -326,9 +324,9 @@ def endswith(suffix: Any, include: bool = False, bind: str | None = None) -> Buf
 
 
 def funcommand(
-    name: str | None = None,
-    prefixes: list[str] | None = None,
-    patterns: list[str] | None = None,
+    name: Optional[str] = None,
+    prefixes: Optional[list[str]] = None,
+    patterns: Optional[list[str]] = None,
 ):
     _config: MountConfig = {"raise_exception": False}
     if name:
@@ -362,6 +360,70 @@ def funcommand(
     return wrapper
 
 
+element_mapping = {"Text": elements.Text}
+
+
+class AvillaCommand(AlconnaString):
+    @staticmethod
+    def args_gen(pattern: str, types: dict):
+        return AlconnaString.args_gen(pattern, {**types, **element_mapping})
+
+    def namespace(self, ns: Union[str, Namespace]):
+        self.buffer["namespace"] = ns
+        return self
+
+    def build(
+        self,
+    ):
+        ns = self.buffer.pop("namespace", None)
+        alc = Alconna(*self.buffer.values(), *self.options, namespace=ns, meta=self.meta)
+        for action in self.actions:
+            alc.bind()(action)
+        for key, args, kwargs in self.shortcuts:
+            alc.shortcut(key, args, **kwargs)  # type: ignore
+        return alc
+
+    def __call__(self, func=None):
+        params = self.buffer.pop("$params", {})
+        if not func:
+            if self.actions:
+
+                async def _func(ctx: Context, cmd: Alconna):
+                    for res in cmd.exec_result.values():
+                        if isinstance(res, Hashable) and is_awaitable(res):
+                            res = await res
+                        if isinstance(res, (str, MessageChain)):
+                            await ctx.scene.send_message(res)
+
+                func = _func
+            else:
+                return
+        return alcommand(self.build(), **params)(func)
+
+
+def Command(
+    command: str,
+    help_text: Optional[str] = None,
+    meta: Optional[CommandMeta] = None,
+    send_error: bool = False,
+    post: bool = False,
+    patterns: Optional[list[str]] = None,
+    comp_session: Optional[CompConfig] = None,
+    need_tome: bool = False,
+    remove_tome: bool = False,
+):
+    cmd = AvillaCommand(command, help_text, meta)
+    cmd.buffer["$params"] = {
+        "send_error": send_error,
+        "post": post,
+        "patterns": patterns,
+        "comp_session": comp_session,
+        "need_tome": need_tome,
+        "remove_tome": remove_tome,
+    }
+    return cmd
+
+
 __all__ = [
     "fetch_name",
     "match_path",
@@ -374,4 +436,5 @@ __all__ = [
     "endswith",
     "MatchSuffix",
     "funcommand",
+    "Command",
 ]

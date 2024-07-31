@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import contextlib
 from atexit import register
@@ -125,7 +123,7 @@ class AlconnaDispatcher(BaseDispatcher):
     async def send(
         self,
         output_type: str,
-        output_text: str | None,
+        output_text: Optional[str],
         source: MessageReceived,
     ) -> None:
         ctx: Context = source.context

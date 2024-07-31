@@ -1,12 +1,15 @@
-from nepattern import (
-    BasePattern,
-    MatchMode,
-    UnionPattern,
-)
 from typing import Union
-from avilla.core.elements import Notice
 
-_NoticeID = BasePattern(mode=MatchMode.TYPE_CONVERT, origin=str, alias="Notice", accepts=Notice, converter=lambda _, x: x.target.pattern["member"])
+from avilla.core.elements import Notice
+from nepattern import BasePattern, MatchMode, UnionPattern
+
+_NoticeID = BasePattern(
+    mode=MatchMode.TYPE_CONVERT,
+    origin=str,
+    alias="Notice",
+    accepts=Notice,
+    converter=lambda _, x: x.target.pattern["member"],
+)
 _NoticeText = BasePattern(
     r"@(.+)",
     mode=MatchMode.REGEX_CONVERT,

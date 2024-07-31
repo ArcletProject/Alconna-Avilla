@@ -4,6 +4,9 @@
 
 包括解析器、Dispatcher、SayaSchema 和 附加组件
 
+> [!WARNING]
+> 本项目与 `avilla.core.builtins.command` 不兼容
+
 ## 安装
 
 ```shell
