@@ -1,6 +1,10 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
 [project]
 name = "arclet-alconna-avilla"
-version = "0.19.0"
+version = "0.19.1"
 description = "Support Alconna for GraiaProject/Avilla"
 authors = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
@@ -28,7 +32,7 @@ alconna_avilla_behavior = "arclet.alconna.avilla.create:AlconnaBehaviorCreator"
 [tool]
 [tool.pdm]
 [tool.pdm.build]
-includes = ["arclet/alconna/avilla"]
+includes = ["arclet/alconna"]
 
 [tool.pdm.dev-dependencies]
 dev = [
