@@ -11,6 +11,7 @@ from arclet.alconna.exceptions import SpecialOptionTriggered
 from arclet.alconna.stub import ArgsStub, OptionStub, SubcommandStub
 from arclet.alconna.tools import AlconnaFormat
 from avilla.core import Context, Message, Notice, Selector
+from avilla.core.exceptions import UnknownTarget
 from avilla.standard.core.message import MessageReceived
 from creart import it
 from graia.amnesia.message import MessageChain
@@ -69,7 +70,8 @@ class AlconnaOutputMessage(Dispatchable):
 
     class Dispatcher(BaseDispatcher):
 
-        async def catch(self, interface: "DispatcherInterface[AlconnaOutputMessage]"):
+        @classmethod
+        async def catch(cls, interface: "DispatcherInterface[AlconnaOutputMessage]"):
             if interface.name == "output" and interface.annotation == str:
                 return interface.event.output
             if interface.name in ("otype", "output_type", "type"):
@@ -114,7 +116,7 @@ class AlconnaDispatcher(BaseDispatcher):
         if not (origin := reply_cache.get(source_id)):
             try:
                 origin = await source.context.pull(Message, source.message.reply)
-            except NotImplementedError:
+            except (NotImplementedError, UnknownTarget, RuntimeError):
                 return message
             else:
                 reply_cache[source_id] = origin

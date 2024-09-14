@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "arclet-alconna-avilla"
-version = "0.19.1"
+version = "0.19.2"
 description = "Support Alconna for GraiaProject/Avilla"
 authors = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
@@ -28,7 +28,6 @@ license = {text = "AGPL-3.0"}
 [project.entry-points."creart.creators"]
 alconna_avilla_behavior = "arclet.alconna.avilla.create:AlconnaBehaviorCreator"
 
-
 [tool]
 [tool.pdm]
 [tool.pdm.build]
@@ -40,11 +39,6 @@ dev = [
     "black>=24.4.2",
     "avilla-onebot-v11>=1.0.0a28",
 ]
-
-[tool.pdm.scripts]
-pre_build = {call = "script:pre_build"}
-post_build = {call = "script:post_build"}
-
 
 [tool.black]
 line-length = 120
