@@ -103,7 +103,7 @@ def alcommand(
     patterns: Optional[list[str]] = None,
     comp_session: Optional[CompConfig] = None,
     need_tome: bool = False,
-    remove_tome: bool = False,
+    remove_tome: bool = True,
     merge_reply: Union[bool, Literal["left", "right"]] = False,
 ) -> SchemaWrapper:
     """
@@ -423,7 +423,7 @@ def Command(
     patterns: Optional[list[str]] = None,
     comp_session: Optional[CompConfig] = None,
     need_tome: bool = False,
-    remove_tome: bool = False,
+    remove_tome: bool = True,
     merge_reply: Union[bool, Literal["left", "right"]] = False,
 ):
     cmd = AvillaCommand(command, help_text, meta)

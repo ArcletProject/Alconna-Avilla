@@ -11,7 +11,7 @@ from arclet.alconna.exceptions import SpecialOptionTriggered
 from arclet.alconna.stub import ArgsStub, OptionStub, SubcommandStub
 from arclet.alconna.tools import AlconnaFormat
 from avilla.core import Context, Message, Notice, Selector
-from avilla.core.exceptions import UnknownTarget
+from avilla.core.exceptions import UnknownTarget, ActionFailed
 from avilla.standard.core.message import MessageReceived
 from creart import it
 from graia.amnesia.message import MessageChain
@@ -91,14 +91,16 @@ class AlconnaDispatcher(BaseDispatcher):
 
     default_send_handler: ClassVar[TConvert] = lambda _, x: MessageChain([Text(x)])
 
-    def is_tome(self, message: MessageChain, account: Selector):
+    @staticmethod
+    def is_tome(message: MessageChain, account: Selector):
         if message.content and isinstance(message[0], Notice):
             notice: Notice = message.get_first(Notice)
             if notice.target.last_value == account.last_value:
                 return True
         return False
 
-    def tome_remove(self, message: MessageChain, account: Selector):
+    @staticmethod
+    def tome_remove(message: MessageChain, account: Selector):
         message = MessageChain(message.content.copy())
         message.content.remove(message.get_first(Notice))
         if message.content and isinstance(message.content[0], Text):
@@ -116,7 +118,7 @@ class AlconnaDispatcher(BaseDispatcher):
         if not (origin := reply_cache.get(source_id)):
             try:
                 origin = await source.context.pull(Message, source.message.reply)
-            except (NotImplementedError, UnknownTarget, RuntimeError):
+            except (NotImplementedError, UnknownTarget, RuntimeError, ActionFailed):
                 return message
             else:
                 reply_cache[source_id] = origin
