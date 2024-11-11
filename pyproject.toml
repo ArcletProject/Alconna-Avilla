@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "arclet-alconna-avilla"
-version = "0.19.2"
+version = "0.19.3"
 description = "Support Alconna for GraiaProject/Avilla"
 authors = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
