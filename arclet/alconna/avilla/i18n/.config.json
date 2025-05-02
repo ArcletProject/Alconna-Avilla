@@ -1,9 +1,9 @@
 {
   "default": "zh-CN",
   "frozen": [
-    "completion.avilla"
+    "completion:avilla"
   ],
   "require": [
-    "completion.avilla"
+    "completion:avilla"
   ]
 }
